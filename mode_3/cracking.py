@@ -1,6 +1,6 @@
 # coding: utf-8
 import sys
-sys.path.append('../..')
+sys.path.append('../')
 from facets import *
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import cg

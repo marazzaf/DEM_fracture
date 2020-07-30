@@ -1,9 +1,8 @@
 # coding: utf-8
 import sys
 sys.path.append('../')
-from facets import *
-from scipy.sparse.linalg import eigsh
-from ufl import sign
+from facets_no_vertex import *
+from scipy.sparse.linalg import eigsh,cg
 
 # Form compiler options
 parameters["form_compiler"]["cpp_optimize"] = True
@@ -11,44 +10,44 @@ parameters["form_compiler"]["optimize"] = True
 #parameters['linear_algebra_backend'] = 'PETSc'
 
 # elastic parameters
-rho = 1.
-mu = .5
-penalty = mu
-Gc = 0.015 #0.01 #0.015
-cs = np.sqrt(mu / rho) #shear wave velocity
-k = .15 #loading speed...
+rho = Constant(1180.)
+nu = 0.35
+E = 3.09e9
+mu = Constant(E / (2.0*(1.0 + nu)))
+lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
+penalty = float(mu)
+Gc = 300
+Delta_u = 0.05e-3 #value from article
 
-Ll, l0, H = 6., 1., 1.
-size_ref = 80 #40 #20 #10
-mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*6, 2*size_ref, "crossed")
+Ll, l0, H = 32e-3, 4.e-3, 16e-3
+size_ref = 1 #5 #10 #20
+mesh = Mesh('mesh_bis/plate_holes_1.xml') # % size_ref)
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
-h = H / size_ref #(5*size_ref)
-print('Mesh size: %.5' % mesh.hmax())
-#print('Shear wave velocity: %.5e' % cs)
-#print('dt ref: %.5e' % (h/cs))
+h = mesh.hmax() #H / size_ref
+c = np.sqrt(float(mu/rho))
 
 # Sub domain for BC
-def upper_left(x, on_boundary):
-    return near(x[0], 0.) and x[1] >= 0. and on_boundary
+def top(x, on_boundary):
+    return near(x[1], H/2) and on_boundary
 
-def lower_left(x, on_boundary):
-    return near(x[0], 0.) and x[1] <= 0. and on_boundary
+def down(x, on_boundary):
+    return near(x[1], -H/2) and on_boundary
 
 def right(x, on_boundary):
     return near(x[0], Ll) and on_boundary
 
-def top_down(x, on_boundary):
-    return near(np.absolute(x[1]), H/2) and on_boundary
+def left(x, on_boundary):
+    return near(x[0], 0.) and on_boundary
 
 bnd_facets.set_all(0)
-traction_boundary_1 = AutoSubDomain(upper_left)
+traction_boundary_1 = AutoSubDomain(top)
 traction_boundary_1.mark(bnd_facets, 41)
-traction_boundary_2 = AutoSubDomain(lower_left)
+traction_boundary_2 = AutoSubDomain(down)
 traction_boundary_2.mark(bnd_facets, 42)
-clamped_boundary = AutoSubDomain(right)
-clamped_boundary.mark(bnd_facets, 45)
-neumann_boundary = AutoSubDomain(top_down)
-neumann_boundary.mark(bnd_facets, 47)
+neumann_boundary_1 = AutoSubDomain(right)
+neumann_boundary_1.mark(bnd_facets, 45)
+neumann_boundary_2 = AutoSubDomain(left)
+neumann_boundary_2.mark(bnd_facets, 47)
 ds = Measure('ds')(subdomain_data=bnd_facets)
 
 # Mesh-related functions
@@ -58,38 +57,32 @@ h_avg = (vol('+') + vol('-'))/ (2. * hF('+'))
 n = FacetNormal(mesh)
 
 #Function spaces
-U_DG = FunctionSpace(mesh, 'DG', 0) #Pour déplacement dans cellules
-U_CR = FunctionSpace(mesh, 'CR', 1) #Pour interpollation dans les faces
-W = VectorFunctionSpace(mesh, 'DG', 0) #, shape=(2,2))
+U_DG = VectorFunctionSpace(mesh, 'DG', 0) #Pour déplacement dans cellules
+U_CR = VectorFunctionSpace(mesh, 'CR', 1) #Pour interpollation dans les faces
+W = TensorFunctionSpace(mesh, 'DG', 0)
+aux_CR = FunctionSpace(mesh, 'CR', 1) #Pour critère élastique. Reste en FunctionSpace
+W_aux = VectorFunctionSpace(mesh, 'CR', 1)
 
 #useful
 for_dim = Function(U_DG)
 dim = for_dim.geometric_dimension()
-d = 1 #scalar problem
+d = dim
 solution_u_DG = Function(U_DG,  name="disp DG")
 solution_v_DG = Function(U_DG,  name="vel DG")
 solution_stress = Function(W, name="Stress")
-
-#definition of time-stepping parameters
-T = 5.
-tl = T/20.
 
 #reference solution
 x = SpatialCoordinate(mesh)
 #quasi-ref solution
 #Dirichlet BC
+u_D = Expression(('0.', 'x[1]/fabs(x[1]) * disp'), disp = Delta_u,degree=2)
+v_D = Expression(('0.', '0.'), degree=0)
 
-g0 = Expression('t <= tl ? 0.5*k * t * t / tl * (1 - x[0]/L) : (k * t - 0.5*k*tl) * (1. - x[0]/L)', L=Ll, tl=tl, k=k, t=0, degree=2)
-u_D = g0 * sign(x[1])
-h0 = Expression('t <= tl ? k * t / tl * (1 - x[0]/L) : k * (1. - x[0]/L)', L=Ll, tl=tl, k=k, t=0, degree=2)
-v_D = h0 * sign(x[1])
-
-#Load and non-homogeneous Dirichlet BC
-def eps(v): #v is a gradient matrix
-    return v
+def eps(v):
+    return sym(v)
 
 def sigma(eps_el):
-    return mu * eps_el #mu
+    return lambda_ * tr(eps_el) * Identity(2) + 2.*mu * eps_el
 
 # Define variational problem
 u_CR = TrialFunction(U_CR)
@@ -100,9 +93,12 @@ Du_DG = TrialFunction(W)
 Dv_DG = TestFunction(W)
 
 #new for BC
-l4 = v_CR('+') / hF * (ds(41) + ds(42) + ds(45))
+l4 = v_CR('+')[1] / hF * (ds(41) + ds(42))
 L4 = assemble(l4)
+#vec_BC = matrice_trace_bord.T * L4.get_local()
 vec_BC = L4.get_local()
+nz = vec_BC.nonzero()[0]
+vec_BC[nz[0]-1] = 1. #fixing rigid movement
 nz_vec_BC = list(vec_BC.nonzero()[0])
 nz_vec_BC = set(nz_vec_BC)
 
@@ -151,6 +147,16 @@ A47 = assemble(a47)
 row,col,val = as_backend_type(A47).mat().getValuesCSR()
 mat_stress = sp.csr_matrix((val, col, row))
 
+#length of facets
+aux = TestFunction(aux_CR)
+areas = assemble(aux('+') * dS).get_local()
+
+#normal to facets
+aux = TestFunction(W_aux)
+normals = assemble(inner(n('-'), aux('-')) / hF('-') * dS ).get_local()
+normals = normals.reshape((initial_nb_ddl_CR // d,d))
+tangents = np.array([normals[:,1],-normals[:,0]]).T
+
 #Assembling mass matrix
 M_lumped = mass_matrix(mesh, d, dim, rho, nb_ddl_ccG)  # M_lumped est un vecteur
 print('Mass matrix assembled !')
@@ -158,35 +164,36 @@ print('Mass matrix assembled !')
 #Homogeneous Neumann BC
 L = np.zeros(nb_ddl_CR)
 
-#paraview output
-file = File('k_0_15/antiplane_%i_.pvd' % size_ref)
-
-#length crack output
-#length_crack = open('k_2_c/length_crack_%i.txt' % size_ref, 'w')
-
-f_CR = TestFunction(U_CR)
-areas = assemble(f_CR('+') * (dS + ds)).get_local() #bien écrit !
+#paraview outputs
+file = File('test/holes_%i_.pvd' % size_ref)
 
 count_output_crack = 0
 cracked_facet_vertices = []
+broken_vertices = set()
+last_broken_vertices = set()
 cracked_facets = set()
-length_cracked_facets = 0.
 
 #initial conditions
 u = np.zeros(nb_ddl_ccG)
 v = np.zeros(nb_ddl_ccG)
 
 cracking_facets = set()
-
-#assembling rigidity matrix
+#before the computation begins, we break the facets to have a crack of length 1
+for (x,y) in G.edges():
+    f = G[x][y]['dof_CR'][0] // d
+    pos = G[x][y]['barycentre']
+    if G[x][y]['breakable'] and np.abs(pos[1]) < 1.e-15 and pos[0] < l0:
+        cracking_facets.add(f)
+        cracked_facet_vertices.append(G[x][y]['vertices']) #position of vertices of the broken facet
+        
+#adapting after crack
+passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)
+out_cracked_facets(test, size_ref, 0, cracked_facet_vertices, dim) #paraview cracked facet file
+cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
 mat_elas = elastic_term(mat_grad, passage_ccG_to_CR)
 mat_pen,mat_jump_1,mat_jump_2 = penalty_term(nb_ddl_ccG, mesh, d, dim, mat_grad, passage_ccG_to_CR, G, nb_ddl_CR, nz_vec_BC)
-passage_ccG_to_DG_1 = ccG_to_DG_1_aux_1 + ccG_to_DG_1_aux_2 * mat_grad * passage_ccG_to_CR #recomputed
 A = mat_elas + mat_pen
 L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
-
-#for Verlet integration
-v_old = np.zeros_like(v)
 
 #Imposing strongly Dirichlet BC
 A_D = mat_D * A * mat_D.T
@@ -194,33 +201,61 @@ A_not_D = mat_not_D * A * mat_not_D.T
 B = mat_not_D * A * mat_D.T
 M_not_D = mat_not_D * M_lumped
 
-#sorties paraview avant début calcul
-#file.write(solution_u_DG, 0)
+#interpolation of Dirichlet BC
+FF = interpolate(u_D, U_CR).vector().get_local()
+F = mat_D * trace_matrix.T * FF
+
+#taking into account exterior loads
+L_not_D = mat_not_D * matrice_trace_bord.T * L
+L_not_D = L_not_D - B * F
+
+#inverting system
+#u_reduced = spsolve(A_not_D, L_not_D)
+u_reduced,info = cg(A_not_D, L_not_D)
+assert(info == 0)
+u = mat_not_D.T * u_reduced + mat_D.T * F
+
+#Post-processing
+vec_u_CR = passage_ccG_to_CR * u
+vec_u_DG = passage_ccG_to_DG * u
+
+#output initial conditions
+solution_u_DG.vector().set_local(vec_u_DG)
+solution_u_DG.vector().apply("insert")
+file.write(solution_u_DG, 0)
+solution_stress.vector().set_local(mat_stress * mat_grad * vec_u_CR)
+solution_stress.vector().apply("insert")
+file.write(solution_stress, 0)
+
+#print('Intial elastic energy: %.5e' % (0.5 * np.dot(u, A * u)))
+
+#definition of time-stepping parameters
+T = 35e-6 #from article
+t = 0.
 
 # Time-stepping parameters
-eig_M = min(M_not_D)
-eig_K = eigsh(A_not_D, k=1, return_eigenvectors=False) #which='LM' (largest in magnitude, great)
-#eig_K = max(np.real(eigenvalues_K))
+eig_M = min(M_lumped)
+eigenvalues_K = eigsh(A_not_D, k=1, return_eigenvectors=False) #which='LM' (largest in magnitude, great)
+eig_K = max(np.real(eigenvalues_K))
 dt = np.sqrt(eig_M / eig_K)
 print('dt: %.5e' % dt)
-print('chi: %.5f' % (h / (k*dt)))
 
-u_not_D = np.zeros(nb_ddl_cells)
-v_not_D = np.zeros_like(nb_ddl_cells)
+u_not_D = mat_not_D * u
+v_not_D = mat_not_D * v
+v_old = v
 
 #Début boucle temporelle
-while g0.t < T:
-    g0.t += dt
-    print('BC disp: %.5e' % g0.t)
-    h0.t += dt
+while t < T:
+    t += dt
+    print('t: %.5e' % t)
 
     #Computing new displacement values for non-Dirichlet dofs
     u_not_D = u_not_D + dt * v_not_D
 
     #interpolation of Dirichlet BC
     #displacement
-    FF = local_project(u_D, U_CR).vector().get_local()
-    F = mat_D * trace_matrix.T * FF
+    FF = interpolate(u_D, U_CR).vector().get_local()
+    F = mat_D * matrice_trace_bord[:initial_nb_ddl_CR,:].T * FF
 
     #computing new disp values
     u = mat_not_D.T * u_not_D + mat_D.T * F
@@ -228,27 +263,51 @@ while g0.t < T:
     #Post-processing
     vec_u_CR = passage_ccG_to_CR * u
     vec_u_DG = passage_ccG_to_DG * u
+    stress = mat_stress * mat_grad * vec_u_CR
+    stress_per_cell = stress.reshape((nb_ddl_cells // d,dim,d)) #For vectorial case
+    strain = mat_strain * mat_grad * vec_u_CR
+    strain_per_cell = strain.reshape((nb_ddl_cells // d,dim,d)) #For vectorial case
 
-    ##sorties paraview
-    #if u_D.t % (T / 12) < dt:
+    #sorties paraview
+    #if t % (T / 10) < dt:
     #    solution_u_DG.vector().set_local(vec_u_DG)
     #    solution_u_DG.vector().apply("insert")
-    #    file.write(solution_u_DG, u_D.t)
-    #    solution_v_DG.vector().set_local(passage_ccG_to_DG * v)
-    #    solution_v_DG.vector().apply("insert")
-    #    file.write(solution_v_DG, u_D.t)
+    #    file.write(solution_u_DG, t)
     #    solution_stress.vector().set_local(mat_stress * mat_grad * vec_u_CR)
     #    solution_stress.vector().apply("insert")
-    #    file.write(solution_stress, u_D.t)
+    #    file.write(solution_stress, t)
 
-    #Cracking criterion
+    #for cracking
     cracking_facets = set()
-    #Computing breaking facets
+
+    #Test of new cracking criterion
     stress_per_facet = average_stresses * mat_grad * vec_u_CR #plain stress
-    Gh = stress_per_facet * stress_per_facet
-    Gh *= 0.5 * np.pi / mu * areas
+    stress_per_facet = stress_per_facet.reshape((initial_nb_ddl_CR // d,d)) #For vectorial case
+
+    ##Regular version without taking into account local contraction
+    #Gh = np.sum(stress_per_facet * stress_per_facet, axis=1)
+
+    #Version taking into account local contraction
+    normal_stress = np.sum(stress_per_facet * normals, axis=1)
+    tangential_stress = np.sum(stress_per_facet * tangents, axis=1)
+    local_contraction = np.where(normal_stress < 0.)
+    normal_stress[local_contraction] = np.zeros_like(local_contraction)
+    Gh = normal_stress * normal_stress + tangential_stress * tangential_stress
+    assert(np.amin(Gh) >= 0.)
+
     #removing energy of already cracked facets
     Gh[list(cracked_facets)] = np.zeros(len(cracked_facets))
+    Gh = np.pi / E * areas * Gh
+
+    ##breaking one facet at a time
+    #f = np.argmax(Gh)
+    #assert( f not in cracked_facets)
+    #cracking_facets = {f}
+    #print(Gh[f])
+    ##print(facet_num.get(f))
+    #c1,c2 = facet_num.get(f)
+    #print(G[c1][c2]['barycentre'])
+    #cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
 
     #breaking several facets at a time
     cracking_facets = set(list(np.where(Gh > Gc)[0]))
@@ -258,65 +317,56 @@ while g0.t < T:
         c1,c2 = facet_num.get(f)
         print(G[c1][c2]['barycentre'])
         cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
-        
+    
 
     #treatment if the crack propagates
     if len(cracking_facets) > 0:
-        ##output
         solution_u_DG.vector().set_local(vec_u_DG)
         solution_u_DG.vector().apply("insert")
-        file.write(solution_u_DG, g0.t)
-        solution_v_DG.vector().set_local(passage_ccG_to_DG * v)
-        solution_v_DG.vector().apply("insert")
-        file.write(solution_v_DG, g0.t)
+        file.write(solution_u_DG, t)
         solution_stress.vector().set_local(mat_stress * mat_grad * vec_u_CR)
         solution_stress.vector().apply("insert")
-        file.write(solution_stress, g0.t)
+        file.write(solution_stress, t)
+        #sys.exit()
 
-        #output with length of the crack in 2d
-        #length_crack.write('%.5e %.5e\n' % (k * u_D.t * H, length_cracked_facets))
-        
+        #print('Dissipated energy cracking: %.5e' % dissipated_energy)
+        #print('total energy: %.5e' % (dissipated_energy + 0.5*np.dot(v,M_lumped * v) + 0.5 * np.dot(u, A * u)))
+
         #storing the number of ccG dof before adding the new facet dofs
         old_nb_dof_ccG = nb_ddl_ccG
-
-        out_cracked_facets('k_0_15', size_ref, count_output_crack, cracked_facet_vertices, dim) #paraview cracked facet file
-        count_output_crack +=1
 
         #adapting after crack
         #penalty terms modification
         mat_jump_1_aux,mat_jump_2_aux = removing_penalty(mesh, d, dim, nb_ddl_ccG, mat_grad, passage_ccG_to_CR, G, nb_ddl_CR, cracking_facets, facet_num)
         mat_jump_1 -= mat_jump_1_aux
         mat_jump_2 -= mat_jump_2_aux
+        #modifying mass and rigidity matrix beacuse of breaking facets...
         passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)
+        out_cracked_facets('test',size_ref, count_output_crack, cracked_facet_vertices, dim) #paraview cracked facet file
+        count_output_crack +=1
 
         #assembling new rigidity matrix and mass matrix after cracking
-        passage_ccG_to_DG_1 = ccG_to_DG_1_aux_1 + ccG_to_DG_1_aux_2 * mat_grad * passage_ccG_to_CR #recomputed
         mat_elas = elastic_term(mat_grad, passage_ccG_to_CR)
+        passage_ccG_to_DG_1 = ccG_to_DG_1_aux_1 + ccG_to_DG_1_aux_2 * mat_grad * passage_ccG_to_CR #recomputed
         #penalty_terms modification
-        #mat_jump_1_aux,mat_jump_2_aux = adding_boundary_penalty(mesh, d, dim, nb_ddl_ccG, mat_grad, passage_ccG_to_CR, G, nb_ddl_CR, cracking_facets, facet_num)
         mat_jump_1.resize((nb_ddl_CR,nb_ddl_ccG))
         mat_jump_2.resize((nb_ddl_CR,nb_ddl_grad))
-        #mat_jump_1 += mat_jump_1_aux
-        #mat_jump_2 += mat_jump_2_aux
         mat_jump = mat_jump_1 + mat_jump_2 * mat_grad * passage_ccG_to_CR
         mat_pen = mat_jump.T * mat_jump
         A = mat_elas + mat_pen #n'a pas de termes pour certains dof qu'on vient de créer
-        L = np.concatenate((L, np.zeros(d * len(cracking_facets)))) #because we have homogeneous Neumann BC on the crack lips !
+        L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
 
         #Imposing strongly Dirichlet BC
         A_D = mat_D * A * mat_D.T
         A_not_D = mat_not_D * A * mat_not_D.T
         B = mat_not_D * A * mat_D.T
-        M_not_D = mat_not_D * M_lumped #not changing
+        M_not_D = mat_not_D * M_lumped
 
-        #recomputing time-step to adapt to the new rigidity matrix and the new mass matrix
-        dt_old = dt
+        ##recomputing time-step to adapt to the new rigidity matrix and the new mass matrix
         #eig_M = min(M_not_D)
-        eig_K = eigsh(A_not_D, k=1, return_eigenvectors=False) #which='LM' (largest in magnitude)
-        dt = np.sqrt(eig_M / eig_K)
-        #if abs(dt_old - dt) / dt_old > 0.01:
-        #    print('Time integration not stable any longer. Terminating computation')
-        #    sys.exit()
+        #eig_K = eigsh(A_not_D, k=1, return_eigenvectors=False) #which='LM' (largest in magnitude)
+        #dt = np.sqrt(eig_M / eig_K)
+        #print('dt: %.5e' % dt)
 
     cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
 
@@ -328,7 +378,7 @@ while g0.t < T:
 
     #interpolation of Dirichlet BC
     #velocity
-    vel_interpolate = local_project(v_D, U_CR).vector().get_local()
+    vel_interpolate = interpolate(v_D, U_CR).vector().get_local()
     vel_D = mat_D * trace_matrix.T * vel_interpolate
 
     #Computing new velocities
@@ -337,6 +387,5 @@ while g0.t < T:
     v_old = v
 
 #computation over
-#length_crack.close()
 print('End of computation !')
 

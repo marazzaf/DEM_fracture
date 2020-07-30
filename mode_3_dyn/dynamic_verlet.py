@@ -3,6 +3,7 @@ import sys
 sys.path.append('../..')
 from facets import *
 from scipy.sparse.linalg import eigsh
+from ufl import sign
 
 # Form compiler options
 parameters["form_compiler"]["cpp_optimize"] = True
@@ -11,15 +12,15 @@ parameters["form_compiler"]["optimize"] = True
 
 # elastic parameters
 rho = 1.
-mu = 0.2
+mu = .5
 penalty = mu
-Gc = 0.01
+Gc = 0.01 #1.5e-2 ???
 cs = np.sqrt(mu / rho) #shear wave velocity
-k = 2*cs #0.2*cs #1.e-3 #comparison with QS #0.1 #loading speed...
+k = .15 #loading speed...
 
-Ll, l0, H = 5., 1., 1.
-size_ref = 20 #40 #20 #10
-mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
+Ll, l0, H = 6., 1., 1.
+size_ref = 10 #40 #20 #10
+mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*6, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref #(5*size_ref)
 #print('Shear wave velocity: %.5e' % cs)
@@ -68,12 +69,21 @@ solution_u_DG = Function(U_DG,  name="disp DG")
 solution_v_DG = Function(U_DG,  name="vel DG")
 solution_stress = Function(W, name="Stress")
 
+#definition of time-stepping parameters
+#T = 1.2 / k
+#T = 2. / k
+#T = 3. / k
+T = 4./k
+tl = T / 20
+
 #reference solution
 x = SpatialCoordinate(mesh)
 #quasi-ref solution
 #Dirichlet BC
-u_D = Expression('x[1]/fabs(x[1]) * k * t * H * (1 - x[0]/L)', L=Ll, H=H, k=k, t=0, degree=2)
-v_D = Expression('x[1]/fabs(x[1]) * k * H * (1 - x[0]/L)', L=Ll, H=H, k=k, t=0, degree=2)
+g0 = Expression('t <= tl ? 0.5*k * t * t / tl * (1 - x[0]/L) : k * t - 0.5*k*tl', L=Ll, tl=tl, k=k, t=0, degree=2)
+u_D = g0 * sign(x[1])
+h0 = Expression('t <= tl ? k * t / tl * (1 - x[0]/L) : k', L=Ll, tl=tl, k=k, t=0, degree=2)
+v_D = h0 * sign(x[1])
 
 #Load and non-homogeneous Dirichlet BC
 def eps(v): #v is a gradient matrix
@@ -168,23 +178,8 @@ u = np.zeros(nb_ddl_ccG)
 v = np.zeros(nb_ddl_ccG)
 
 cracking_facets = set()
-#before the computation begins, we break the facets to have a crack of length 1
-closest = 0
-for (x,y) in G.edges():
-    f = G[x][y]['dof_CR'][0] // d
-    pos = G[x][y]['barycentre']
-    if G[x][y]['breakable'] and np.abs(pos[1]) < 1.e-15 and pos[0] < l0:
-        length_cracked_facets += areas[f]
-        cracked_facets_vertices.append(G[x][y]['vertices']) #position of vertices of the broken facet
-        cracking_facets.add(f)
-        if pos[0] > l0 - h:
-            closest = f
-#print(cracking_facets)
-#print(length_cracked_facets)
-#adapting after crack
-passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)
-#out_cracked_facets('k_0_2', size_ref, count_output_crack, cracked_facets_vertices, dim) #paraview cracked facet file
-cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
+
+#assembling rigidity matrix
 mat_elas = elastic_term(mat_grad, passage_ccG_to_CR)
 mat_pen,mat_jump_1,mat_jump_2 = penalty_term(nb_ddl_ccG, mesh, d, dim, mat_grad, passage_ccG_to_CR, G, nb_ddl_CR, nz_vec_BC)
 passage_ccG_to_DG_1 = ccG_to_DG_1_aux_1 + ccG_to_DG_1_aux_2 * mat_grad * passage_ccG_to_CR #recomputed
@@ -202,14 +197,6 @@ M_not_D = mat_not_D * M_lumped
 
 #sorties paraview avant début calcul
 #file.write(solution_u_DG, 0)
-
-#definition of time-stepping parameters
-#T = 1.2 / k
-#T = 2. / k
-#T = 3. / k
-T = 4./k
-#dt = 10 * h / c #10 * h / c #5 * h / c
-#print('dt ref: %.5e' % (10 * h / cs))
 
 # Time-stepping parameters
 eig_M = min(M_not_D)

@@ -16,14 +16,15 @@ mu = .5
 penalty = mu
 Gc = 0.015 #0.01 #0.015
 cs = np.sqrt(mu / rho) #shear wave velocity
-k = .15 #loading speed...
+k = 3e-2 #.15 #too difficult
 
 Ll, l0, H = 6., 1., 1.
 size_ref = 80 #40 #20 #10
-mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*6, 2*size_ref, "crossed")
+#mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*6, 2*size_ref, "crossed")
+mesh = Mesh('mesh/cracked_plate.xml')
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref #(5*size_ref)
-print('Mesh size: %.5' % mesh.hmax())
+print('Mesh size: %.5e' % mesh.hmax())
 #print('Shear wave velocity: %.5e' % cs)
 #print('dt ref: %.5e' % (h/cs))
 
@@ -159,7 +160,7 @@ print('Mass matrix assembled !')
 L = np.zeros(nb_ddl_CR)
 
 #paraview output
-file = File('k_0_15/antiplane_%i_.pvd' % size_ref)
+file = File('k_3_e_2_bis/antiplane_%i_.pvd' % size_ref)
 
 #length crack output
 #length_crack = open('k_2_c/length_crack_%i.txt' % size_ref, 'w')
@@ -177,6 +178,7 @@ u = np.zeros(nb_ddl_ccG)
 v = np.zeros(nb_ddl_ccG)
 
 cracking_facets = set()
+potentially_cracking_facets = set(list(np.array(initial_nb_ddl_CR // d)))
 
 #assembling rigidity matrix
 mat_elas = elastic_term(mat_grad, passage_ccG_to_CR)
@@ -229,17 +231,17 @@ while g0.t < T:
     vec_u_CR = passage_ccG_to_CR * u
     vec_u_DG = passage_ccG_to_DG * u
 
-    ##sorties paraview
-    #if u_D.t % (T / 12) < dt:
-    #    solution_u_DG.vector().set_local(vec_u_DG)
-    #    solution_u_DG.vector().apply("insert")
-    #    file.write(solution_u_DG, u_D.t)
-    #    solution_v_DG.vector().set_local(passage_ccG_to_DG * v)
-    #    solution_v_DG.vector().apply("insert")
-    #    file.write(solution_v_DG, u_D.t)
-    #    solution_stress.vector().set_local(mat_stress * mat_grad * vec_u_CR)
-    #    solution_stress.vector().apply("insert")
-    #    file.write(solution_stress, u_D.t)
+    #sorties paraview
+    if g0.t % (T / 12) < dt:
+        solution_u_DG.vector().set_local(vec_u_DG)
+        solution_u_DG.vector().apply("insert")
+        file.write(solution_u_DG, g0.t)
+        solution_v_DG.vector().set_local(passage_ccG_to_DG * v)
+        solution_v_DG.vector().apply("insert")
+        file.write(solution_v_DG, g0.t)
+        solution_stress.vector().set_local(mat_stress * mat_grad * vec_u_CR)
+        solution_stress.vector().apply("insert")
+        file.write(solution_stress, g0.t)
 
     #Cracking criterion
     cracking_facets = set()
@@ -253,11 +255,16 @@ while g0.t < T:
     #breaking several facets at a time
     cracking_facets = set(list(np.where(Gh > Gc)[0]))
     assert(len(cracking_facets & cracked_facets) == 0)
+    cracking_facets &= potentially_cracking_facets #all facets cannot be broken
+    if len(cracked_facets) == 0 and len(cracking_facets) > 0:
+        potentially_cracking_facets = set() #after first crack, only facets close to crack can break
     for f in cracking_facets:
         print(Gh[f])
         c1,c2 = facet_num.get(f)
         print(G[c1][c2]['barycentre'])
         cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
+        potentially_cracking_ |= facet_to_facet.get(f) #updating set
+    potentially_cracking -= cracking_facets #removing facets that will be cracked at the end of iteration
         
 
     #treatment if the crack propagates
@@ -279,7 +286,7 @@ while g0.t < T:
         #storing the number of ccG dof before adding the new facet dofs
         old_nb_dof_ccG = nb_ddl_ccG
 
-        out_cracked_facets('k_0_15', size_ref, count_output_crack, cracked_facet_vertices, dim) #paraview cracked facet file
+        out_cracked_facets('k_3_e_2_bis', size_ref, count_output_crack, cracked_facet_vertices, dim) #paraview cracked facet file
         count_output_crack +=1
 
         #adapting after crack

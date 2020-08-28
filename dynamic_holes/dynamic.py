@@ -1,7 +1,7 @@
 # coding: utf-8
 import sys
 sys.path.append('../')
-from facets_no_vertex import *
+from facets import *
 from scipy.sparse.linalg import eigsh,cg
 
 # Form compiler options
@@ -20,8 +20,8 @@ Gc = 300
 Delta_u = 0.05e-3 #value from article
 
 Ll, l0, H = 32e-3, 4.e-3, 16e-3
-size_ref = 1 #5 #10 #20
-mesh = Mesh('mesh_bis/plate_holes_1.xml') # % size_ref)
+size_ref = 2 #5 #10 #20
+mesh = Mesh('mesh_bis/plate_holes_2.xml') # % size_ref)
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = mesh.hmax() #H / size_ref
 c = np.sqrt(float(mu/rho))
@@ -95,7 +95,7 @@ Dv_DG = TestFunction(W)
 #new for BC
 l4 = v_CR('+')[1] / hF * (ds(41) + ds(42))
 L4 = assemble(l4)
-#vec_BC = matrice_trace_bord.T * L4.get_local()
+#vec_BC = trace_matrix.T * L4.get_local()
 vec_BC = L4.get_local()
 nz = vec_BC.nonzero()[0]
 vec_BC[nz[0]-1] = 1. #fixing rigid movement
@@ -188,7 +188,7 @@ for (x,y) in G.edges():
         
 #adapting after crack
 passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)
-out_cracked_facets(test, size_ref, 0, cracked_facet_vertices, dim) #paraview cracked facet file
+out_cracked_facets('test', size_ref, 0, cracked_facet_vertices, dim) #paraview cracked facet file
 cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
 mat_elas = elastic_term(mat_grad, passage_ccG_to_CR)
 mat_pen,mat_jump_1,mat_jump_2 = penalty_term(nb_ddl_ccG, mesh, d, dim, mat_grad, passage_ccG_to_CR, G, nb_ddl_CR, nz_vec_BC)
@@ -206,8 +206,9 @@ FF = interpolate(u_D, U_CR).vector().get_local()
 F = mat_D * trace_matrix.T * FF
 
 #taking into account exterior loads
-L_not_D = mat_not_D * matrice_trace_bord.T * L
-L_not_D = L_not_D - B * F
+#L_not_D = mat_not_D * trace_matrix.T * L
+#L_not_D = L_not_D - B * F
+L_not_D = -B*F
 
 #inverting system
 #u_reduced = spsolve(A_not_D, L_not_D)
@@ -234,7 +235,7 @@ T = 35e-6 #from article
 t = 0.
 
 # Time-stepping parameters
-eig_M = min(M_lumped)
+eig_M = min(M_not_D)
 eigenvalues_K = eigsh(A_not_D, k=1, return_eigenvectors=False) #which='LM' (largest in magnitude, great)
 eig_K = max(np.real(eigenvalues_K))
 dt = np.sqrt(eig_M / eig_K)
@@ -255,7 +256,7 @@ while t < T:
     #interpolation of Dirichlet BC
     #displacement
     FF = interpolate(u_D, U_CR).vector().get_local()
-    F = mat_D * matrice_trace_bord[:initial_nb_ddl_CR,:].T * FF
+    F = mat_D * trace_matrix.T * FF
 
     #computing new disp values
     u = mat_not_D.T * u_not_D + mat_D.T * F
@@ -265,8 +266,8 @@ while t < T:
     vec_u_DG = passage_ccG_to_DG * u
     stress = mat_stress * mat_grad * vec_u_CR
     stress_per_cell = stress.reshape((nb_ddl_cells // d,dim,d)) #For vectorial case
-    strain = mat_strain * mat_grad * vec_u_CR
-    strain_per_cell = strain.reshape((nb_ddl_cells // d,dim,d)) #For vectorial case
+    #strain = mat_strain * mat_grad * vec_u_CR
+    #strain_per_cell = strain.reshape((nb_ddl_cells // d,dim,d)) #For vectorial case
 
     #sorties paraview
     #if t % (T / 10) < dt:
@@ -299,24 +300,24 @@ while t < T:
     Gh[list(cracked_facets)] = np.zeros(len(cracked_facets))
     Gh = np.pi / E * areas * Gh
 
-    ##breaking one facet at a time
-    #f = np.argmax(Gh)
-    #assert( f not in cracked_facets)
-    #cracking_facets = {f}
-    #print(Gh[f])
-    ##print(facet_num.get(f))
-    #c1,c2 = facet_num.get(f)
-    #print(G[c1][c2]['barycentre'])
-    #cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
+    #breaking one facet at a time
+    f = np.argmax(Gh)
+    assert( f not in cracked_facets)
+    cracking_facets = {f}
+    print(Gh[f])
+    #print(facet_num.get(f))
+    c1,c2 = facet_num.get(f)
+    print(G[c1][c2]['barycentre'])
+    cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
 
-    #breaking several facets at a time
-    cracking_facets = set(list(np.where(Gh > Gc)[0]))
-    assert(len(cracking_facets & cracked_facets) == 0)
-    for f in cracking_facets:
-        print(Gh[f])
-        c1,c2 = facet_num.get(f)
-        print(G[c1][c2]['barycentre'])
-        cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
+    ##breaking several facets at a time
+    #cracking_facets = set(list(np.where(Gh > Gc)[0]))
+    #assert(len(cracking_facets & cracked_facets) == 0)
+    #for f in cracking_facets:
+    #    print(Gh[f])
+    #    c1,c2 = facet_num.get(f)
+    #    print(G[c1][c2]['barycentre'])
+    #    cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
     
 
     #treatment if the crack propagates

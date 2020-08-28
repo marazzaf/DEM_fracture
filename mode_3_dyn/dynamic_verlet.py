@@ -19,9 +19,9 @@ cs = np.sqrt(mu / rho) #shear wave velocity
 k = 3e-2 #.15 #too difficult
 
 Ll, l0, H = 6., 1., 1.
-size_ref = 80 #40 #20 #10
+size_ref = 1 #40 #20 #10
 #mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*6, 2*size_ref, "crossed")
-mesh = Mesh('mesh/cracked_plate.xml')
+mesh = Mesh('mesh/coarse.xml')
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref #(5*size_ref)
 print('Mesh size: %.5e' % mesh.hmax())
@@ -160,7 +160,7 @@ print('Mass matrix assembled !')
 L = np.zeros(nb_ddl_CR)
 
 #paraview output
-file = File('k_3_e_2_bis/antiplane_%i_.pvd' % size_ref)
+file = File('test/antiplane_%i_.pvd' % size_ref)
 
 #length crack output
 #length_crack = open('k_2_c/length_crack_%i.txt' % size_ref, 'w')
@@ -178,7 +178,7 @@ u = np.zeros(nb_ddl_ccG)
 v = np.zeros(nb_ddl_ccG)
 
 cracking_facets = set()
-potentially_cracking_facets = set(list(np.array(initial_nb_ddl_CR // d)))
+potentially_cracking_facets = set(list(np.arange(initial_nb_ddl_CR // d)))
 cells_to_test = set()
 
 #assembling rigidity matrix
@@ -262,19 +262,22 @@ while g0.t < T:
     for c in cells_to_test:
         test_set = set()
         for n in nx.neighbors(G,c):
-            if n >= 0 and n < nb_ddl_cells // d:
-                test_set.add(G[n][c]['num'])
+            #if n >= 0 and n < nb_ddl_cells // d:
+            test_set.add(G[n][c]['num'])
+        assert len(test_set) == dim+1
         #remove the third element if the two others are present...
-        if len(cracked_facets & test_set) == dim and len((cracking_facets | cracked_facets) & test_set) == dim+1:
-            cracking_facets.discard(G[n][c]['num'])
+        test_1 = cracked_facets & test_set
+        test_2 = (cracking_facets | cracked_facets) & test_set
+        if len(test_1) == dim and len(test_2) == dim+1:
+            cracking_facets.discard(list(test_2 - test_1)[0])
     for f in cracking_facets:
         print(Gh[f])
         c1,c2 = facet_num.get(f)
         print(G[c1][c2]['barycentre'])
         cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
-        potentially_cracking_ |= facet_to_facet.get(f) #updating set
+        potentially_cracking_facets |= facet_to_facet.get(f) #updating set
         cells_to_test |= set(facet_num.get(f))
-    potentially_cracking -= cracking_facets #removing facets that will be cracked at the end of iteration
+    potentially_cracking_facets -= cracking_facets #removing facets that will be cracked at the end of iteration
         
 
     #treatment if the crack propagates
@@ -296,7 +299,7 @@ while g0.t < T:
         #storing the number of ccG dof before adding the new facet dofs
         old_nb_dof_ccG = nb_ddl_ccG
 
-        out_cracked_facets('k_3_e_2_bis', size_ref, count_output_crack, cracked_facet_vertices, dim) #paraview cracked facet file
+        out_cracked_facets('test', size_ref, count_output_crack, cracked_facet_vertices, dim) #paraview cracked facet file
         count_output_crack +=1
 
         #adapting after crack

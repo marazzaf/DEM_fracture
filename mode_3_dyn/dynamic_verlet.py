@@ -126,6 +126,7 @@ passage_ccG_to_CR,trace_matrix = matrice_passage_ccG_CR(mesh, coord_num, coord_b
 passage_ccG_to_DG = matrice_passage_ccG_DG(nb_ddl_cells,nb_ddl_ccG)
 passage_ccG_to_DG_1,ccG_to_DG_1_aux_1,ccG_to_DG_1_aux_2 = matrice_passage_ccG_DG_1(mesh, nb_ddl_ccG, d, dim, mat_grad, passage_ccG_to_CR)
 facet_to_facet = linked_facets(mesh,dim,G) #designed to lighten research of potentialy failing facets close to a broken facet
+facets_cell = facets_in_cell(mesh,d)
 nb_ddl_grad = W.dofmap().global_dimension()
 mat_not_D,mat_D = schur(nb_ddl_cells, nb_ddl_ccG)
 print('matrices passage Schur ok')
@@ -257,18 +258,21 @@ while g0.t < T:
     cracking_facets = set(list(np.where(Gh > Gc)[0]))
     assert(len(cracking_facets & cracked_facets) == 0)
     cracking_facets &= potentially_cracking_facets #all facets cannot be broken
+    #print(potentially_cracking_facets)
     if len(cracked_facets) == 0 and len(cracking_facets) > 0:
         potentially_cracking_facets = set() #after first crack, only facets close to crack can break
     for c in cells_to_test:
-        test_set = set()
-        for n in nx.neighbors(G,c):
-            #if n >= 0 and n < nb_ddl_cells // d:
-            test_set.add(G[n][c]['num'])
-        assert len(test_set) == dim+1
+        #test_set = set()
+        #for n in nx.neighbors(G,c):
+        #    #if n >= 0 and n < nb_ddl_cells // d:
+        #    test_set.add(G[n][c]['num'])
+        #assert len(test_set) == dim+1
+        test_set = facets_cell.get(c)
         #remove the third element if the two others are present...
         test_1 = cracked_facets & test_set
         test_2 = (cracking_facets | cracked_facets) & test_set
         if len(test_1) == dim and len(test_2) == dim+1:
+            print('Discarded: %i' % (list(test_2 - test_1)[0]))
             cracking_facets.discard(list(test_2 - test_1)[0])
     for f in cracking_facets:
         print(Gh[f])

@@ -179,6 +179,7 @@ v = np.zeros(nb_ddl_ccG)
 
 cracking_facets = set()
 potentially_cracking_facets = set(list(np.array(initial_nb_ddl_CR // d)))
+cells_to_test = set()
 
 #assembling rigidity matrix
 mat_elas = elastic_term(mat_grad, passage_ccG_to_CR)
@@ -258,12 +259,21 @@ while g0.t < T:
     cracking_facets &= potentially_cracking_facets #all facets cannot be broken
     if len(cracked_facets) == 0 and len(cracking_facets) > 0:
         potentially_cracking_facets = set() #after first crack, only facets close to crack can break
+    for c in cells_to_test:
+        test_set = set()
+        for n in nx.neighbors(G,c):
+            if n >= 0 and n < nb_ddl_cells // d:
+                test_set.add(G[n][c]['num'])
+        #remove the third element if the two others are present...
+        if len(cracked_facets & test_set) == dim and len((cracking_facets | cracked_facets) & test_set) == dim+1:
+            cracking_facets.discard(G[n][c]['num'])
     for f in cracking_facets:
         print(Gh[f])
         c1,c2 = facet_num.get(f)
         print(G[c1][c2]['barycentre'])
         cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
         potentially_cracking_ |= facet_to_facet.get(f) #updating set
+        cells_to_test |= set(facet_num.get(f))
     potentially_cracking -= cracking_facets #removing facets that will be cracked at the end of iteration
         
 

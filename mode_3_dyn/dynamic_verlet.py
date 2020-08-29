@@ -19,9 +19,9 @@ cs = np.sqrt(mu / rho) #shear wave velocity
 k = 3e-2 #.15 #too difficult
 
 Ll, l0, H = 6., 1., 1.
-size_ref = 1 #40 #20 #10
-#mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*6, 2*size_ref, "crossed")
-mesh = Mesh('mesh/coarse.xml')
+size_ref = 80 #40 #20 #10
+mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*6, 2*size_ref, "crossed")
+#mesh = Mesh('mesh/fine.xml')
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref #(5*size_ref)
 print('Mesh size: %.5e' % mesh.hmax())
@@ -161,7 +161,7 @@ print('Mass matrix assembled !')
 L = np.zeros(nb_ddl_CR)
 
 #paraview output
-file = File('test/antiplane_%i_.pvd' % size_ref)
+file = File('k_3_e_2/antiplane_%i_.pvd' % size_ref)
 
 #length crack output
 #length_crack = open('k_2_c/length_crack_%i.txt' % size_ref, 'w')
@@ -303,7 +303,7 @@ while g0.t < T:
         #storing the number of ccG dof before adding the new facet dofs
         old_nb_dof_ccG = nb_ddl_ccG
 
-        out_cracked_facets('test', size_ref, count_output_crack, cracked_facet_vertices, dim) #paraview cracked facet file
+        out_cracked_facets('k_3_e_2', size_ref, count_output_crack, cracked_facet_vertices, dim) #paraview cracked facet file
         count_output_crack +=1
 
         #adapting after crack

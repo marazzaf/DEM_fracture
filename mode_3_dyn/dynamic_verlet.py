@@ -72,7 +72,7 @@ solution_v_DG = Function(U_DG,  name="vel DG")
 solution_stress = Function(W, name="Stress")
 
 #definition of time-stepping parameters
-T = 5.
+T = 10 #5.
 tl = T/20.
 
 #reference solution
@@ -262,11 +262,6 @@ while g0.t < T:
     if len(cracked_facets) == 0 and len(cracking_facets) > 0:
         potentially_cracking_facets = set() #after first crack, only facets close to crack can break
     for c in cells_to_test:
-        #test_set = set()
-        #for n in nx.neighbors(G,c):
-        #    #if n >= 0 and n < nb_ddl_cells // d:
-        #    test_set.add(G[n][c]['num'])
-        #assert len(test_set) == dim+1
         test_set = facets_cell.get(c)
         #remove the third element if the two others are present...
         test_1 = cracked_facets & test_set
@@ -281,6 +276,7 @@ while g0.t < T:
         print(G[c1][c2]['barycentre'])
         cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
         potentially_cracking_facets |= facet_to_facet.get(f) #updating set
+        potentially_cracking_facets -= (facets_cell.get(c1) | facets_cell.get(c2))
         cells_to_test |= set(facet_num.get(f))
     potentially_cracking_facets -= cracking_facets #removing facets that will be cracked at the end of iteration
         

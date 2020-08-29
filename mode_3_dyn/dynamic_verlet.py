@@ -276,9 +276,15 @@ while g0.t < T:
         print(G[c1][c2]['barycentre'])
         cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
         potentially_cracking_facets |= facet_to_facet.get(f) #updating set
-        potentially_cracking_facets -= (facets_cell.get(c1) | facets_cell.get(c2))
         cells_to_test |= set(facet_num.get(f))
-    potentially_cracking_facets -= cracking_facets #removing facets that will be cracked at the end of iteration
+    #potentially_cracking_facets -= cracking_facets #removing facets that will be cracked at the end of iteration
+    
+    for f in cracking_facets:
+        c1,c2 = facet_num.get(f)
+        potentially_cracking_facets -= (facets_cell.get(c1) | facets_cell.get(c2))
+    for f in cracked_facets:
+        c1 = facet_num.get(f)[0]
+        potentially_cracking_facets -= facets_cell.get(c1)
         
 
     #treatment if the crack propagates

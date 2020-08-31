@@ -21,12 +21,12 @@ Ll, l0, H = 5., 1., 1.
 #folder = 'no_initial_crack'
 folder = 'unstructured'
 #h = H / size_ref
-size_ref = 3
-mesh = Mesh('mesh/test.xml') #3
+#size_ref = 3
+#mesh = Mesh('mesh/test.xml') #3
 #size_ref = 2
 #mesh = Mesh('mesh/cracked_plate_fine.xml')
-#size_ref = 1
-#mesh = Mesh('mesh/cracked_plate_coarse.xml')
+size_ref = 1
+mesh = Mesh('mesh/cracked_plate_coarse.xml')
 h = mesh.hmax()
 print(h)
 #h = 0.025 #0.025 #0.05
@@ -121,6 +121,7 @@ passage_ccG_to_CR,trace_matrix = matrice_passage_ccG_CR(mesh, coord_num, coord_b
 passage_ccG_to_DG = matrice_passage_ccG_DG(nb_ddl_cells,nb_ddl_ccG)
 passage_ccG_to_DG_1,ccG_to_DG_1_aux_1,ccG_to_DG_1_aux_2 = matrice_passage_ccG_DG_1(mesh, nb_ddl_ccG, d, dim, mat_grad, passage_ccG_to_CR)
 facet_to_facet = linked_facets(mesh,dim,G) #designed to lighten research of potentialy failing facets close to a broken facet
+facets_cell = facets_in_cell(mesh,d)
 nb_ddl_grad = W.dofmap().global_dimension()
 mat_not_D,mat_D = schur(nb_ddl_cells, nb_ddl_ccG)
 
@@ -167,6 +168,7 @@ length_cracked_facets = 0.
 u = np.zeros(nb_ddl_ccG)
 
 cracking_facets = set()
+cells_to_test = set()
 #before the computation begins, we break the facets to have a crack of length 1
 for (x,y) in G.edges():
     f = G[x][y]['dof_CR'][0] // d
@@ -175,6 +177,7 @@ for (x,y) in G.edges():
         cracking_facets.add(f)
         #crack.node[f]['broken'] = True #to update the graph of the crack
         cracked_facet_vertices.append(G[x][y]['vertices']) #position of vertices of the broken facet
+        cells_to_test |= set(facet_num.get(f)) #verifying only one facet per cell breaks
 
 #adapting after crack
 passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)
@@ -185,13 +188,19 @@ mat_pen,mat_jump_1,mat_jump_2 = penalty_term(nb_ddl_ccG, mesh, d, dim, mat_grad,
 A = mat_elas + mat_pen
 L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
 
+#Updating potentially breaking facets
+potentially_cracking_facets = set()
+for f in cracked_facets:
+    potentially_cracking_facets |= facet_to_facet.get(f) #updating set
+
+
 #Imposing strongly Dirichlet BC
 A_D = mat_D * A * mat_D.T
 A_not_D = mat_not_D * A * mat_not_D.T
 B = mat_not_D * A * mat_D.T
 
 #definition of time-stepping parameters
-T = 1. / k
+T = 1. / k #1. / k
 chi = 4.5
 dt = h / (k * chi)
 #print(dt)
@@ -247,16 +256,25 @@ while u_D.t < T:
         Gh[list(cracked_facets)] = np.zeros(len(cracked_facets))
 
         #breaking one facet at a time
-        f = np.argmax(Gh)
-        assert( f not in cracked_facets)
-        if Gh[f] > Gc: #otherwise not cracking !
-            cracking_facets = {f}
-            print(Gh[f])
-            c1,c2 = facet_num.get(f)
-            print(G[c1][c2]['barycentre'])
-            cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
-        else:
-            inverting = False
+        args = np.argpartition(Gh, -20)[-20:] #is 20 enough?
+        #f = np.argmax(Gh)
+        for f in args: 
+            assert f not in cracked_facets
+            if Gh[f] > Gc and f in potentially_cracking_facets: #otherwise not cracking !
+                #Verifying that it is the only facet of two cells to break
+                c1,c2 = facet_num.get(f)
+                test_1 = cracked_facets & facets_cell.get(c1)
+                test_2 = cracked_facets & facets_cell.get(c2)
+                if len(test_1) == 0 and len(test_2) == 0:
+                    cracking_facets = {f}
+                    print(Gh[f])
+                    #print(G[c1][c2]['barycentre'])
+                    cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
+                    potentially_cracking_facets |= facet_to_facet.get(f) #updating set
+                    cells_to_test |= set(facet_num.get(f))
+                    break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
+            else:
+                inverting = False
 
         ##breaking several facets at a time
         #cracking_facets = set(list(np.where(Gh > Gc)[0]))
@@ -285,6 +303,12 @@ while u_D.t < T:
             pos = G[n1][n2]['barycentre']
             #print('dof num: %i' % f)
             print('pos bary facet : (%f,%f)' % (pos[0], pos[1]))
+            potentially_cracking_facets -= (facets_cell.get(n1) | facets_cell.get(n2)) #so that no other facet of these two cells will break
+
+        #to be sure not to break facets of a cell that already has a broken facet
+        for f in cracked_facets:
+            c1 = facet_num.get(f)[0]
+            potentially_cracking_facets -= facets_cell.get(c1)
 
         #treatment if the crack propagates
         if len(cracking_facets) > 0:

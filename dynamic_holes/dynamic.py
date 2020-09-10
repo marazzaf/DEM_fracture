@@ -298,7 +298,7 @@ while t < T:
 
     #removing energy of already cracked facets
     Gh[list(cracked_facets)] = np.zeros(len(cracked_facets))
-    Gh = np.pi / E * areas * Gh
+    Gh *= np.pi / E * areas
 
     #breaking one facet at a time
     f = np.argmax(Gh)

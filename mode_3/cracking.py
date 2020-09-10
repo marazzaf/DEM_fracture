@@ -16,20 +16,20 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-#size_ref = 20 #40 #20 #10
-#mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
+folder = 'structured'
+size_ref = 5 #40 #20 #10
+mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 #folder = 'no_initial_crack'
-folder = 'unstructured'
+#folder = 'unstructured'
 #h = H / size_ref
 #size_ref = 3
 #mesh = Mesh('mesh/test.xml') #3
 #size_ref = 2
 #mesh = Mesh('mesh/cracked_plate_fine.xml')
-size_ref = 1
-mesh = Mesh('mesh/cracked_plate_coarse.xml')
+#size_ref = 1
+#mesh = Mesh('mesh/cracked_plate_coarse.xml')
 h = mesh.hmax()
 print(h)
-#h = 0.025 #0.025 #0.05
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 
 # Sub domain for BC
@@ -153,9 +153,6 @@ areas = assemble(f_CR('+') * (dS + ds)).get_local() #bien écrit !
 #Homogeneous Neumann BC
 L = np.zeros(nb_ddl_CR)
 
-#file = File('test.pvd')
-#file = File('unstructured/anti_plane_%i_.pvd' % size_ref)
-#file = File('structured/anti_plane_%i_.pvd' % size_ref)
 file = File('%s/anti_plane_%i_.pvd' % (folder,size_ref))
 
 count_output_crack = 1
@@ -192,7 +189,6 @@ L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
 potentially_cracking_facets = set()
 for f in cracked_facets:
     potentially_cracking_facets |= facet_to_facet.get(f) #updating set
-
 
 #Imposing strongly Dirichlet BC
 A_D = mat_D * A * mat_D.T
@@ -233,7 +229,8 @@ while u_D.t < T:
         vec_u_CR = passage_ccG_to_CR * u
         vec_u_DG = passage_ccG_to_DG * u
         facet_stresses = average_stresses * mat_grad * vec_u_CR
-        #stress_per_cell = stresses.reshape((nb_ddl_cells // d,dim))
+        stresses = mat_stress * mat_grad * vec_u_CR
+        stress_per_cell = stresses.reshape((nb_ddl_cells // d,dim))
         #strain = mat_strain * mat_grad * vec_u_CR
         #strain_per_cell = strain.reshape((nb_ddl_cells // d,dim))
 
@@ -260,6 +257,19 @@ while u_D.t < T:
         #f = np.argmax(Gh)
         for f in args: 
             assert f not in cracked_facets
+            #for test
+            print('Facet G: %.5e' % Gh[f])
+            c1,c2 = facet_num.get(f)
+            normal = G[c1][c2]['normal']
+            stress_1 = np.dot(stress_per_cell[c1],normal)
+            stress_2 = np.dot(stress_per_cell[c2],normal)
+            G1 = stress_1 * stress_1
+            G1 *= 0.5 * np.pi / mu * areas[f] #areas is not exact be that will do
+            G2 = stress_2 * stress_2
+            G2 *= 0.5 * np.pi / mu * areas[f]
+            print('Cell G: %.5e and %.5e' % (G1,G2))
+
+            #cracking criterion
             if Gh[f] > Gc and f in potentially_cracking_facets: #otherwise not cracking !
                 #Verifying that it is the only facet of two cells to break
                 c1,c2 = facet_num.get(f)

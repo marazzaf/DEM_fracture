@@ -20,10 +20,15 @@ k = 1. #loading speed
 Ll, l0, H = 32e-3, 4e-3, 16e-3
 
 #mesh
-size_ref = 5 #20 #10 #5 #1 #debug
+size_ref = 40 #20 #10 #5 #1 #debug
 mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref*8, size_ref*4, "crossed")
 folder = 'structured'
-#size_ref = 0
+#folder = 'unstructured'
+#size_ref = 2
+#mesh = Mesh('mesh/plate_5_E_4.xml')
+#size_ref = 1
+#mesh = Mesh('mesh/plate_1_E_3.xml')
+#size_ref = 3
 #mesh = Mesh('mesh/plate_1_E_4.xml')
 h = mesh.hmax()
 #finir plus tard pour taille des mailles.
@@ -95,6 +100,10 @@ nz_vec_BC = set(nz_vec_BC)
 #normal_stress_BC = Expression(('x[1]/fabs(x[1]) * tau * (1. + 1e-4*t)', 'x[1]/fabs(x[1]) * sigma * (1 + 1e-4*t)'), sigma=sigma, tau=tau, t=0, degree=2)
 #L = interpolate(normal_stress_BC, U_CR).vector().get_local()
 
+#For Dirichlet BC
+x = SpatialCoordinate(mesh)
+u_D = Expression(('0.', 'x[1]/fabs(x[1]) * k * t * H'), H=H, k=k, t=0, degree=1)
+
 #Load and non-homogeneous Dirichlet BC
 def eps(v): #v is a gradient matrix
     return sym(v)
@@ -151,8 +160,8 @@ average_stresses = sp.csr_matrix((val, col, row))
 f_CR = TestFunction(aux_CR)
 areas = assemble(f_CR('+') * (dS + ds)).get_local() #bien écrit !
 
-##Homogeneous Neumann BC
-#L = np.zeros(nb_ddl_CR)
+#Homogeneous Neumann BC
+L = np.zeros(nb_ddl_CR)
 
 ##Non homogeneous Neumann BC
 #sigma = 1.e3
@@ -164,7 +173,7 @@ areas = assemble(f_CR('+') * (dS + ds)).get_local() #bien écrit !
 #L = interpolate(normal_stress_BC, U_CR).vector().get_local()
 
 
-file = File('structured/test_%i_.pvd' % size_ref) #51)
+file = File('%s/test_%i_.pvd' % (folder,size_ref))
 
 count_output_energy_release = 0
 count_output_disp = 0
@@ -193,9 +202,19 @@ passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_a
 out_cracked_facets(folder, size_ref, 0, cracked_facet_vertices, dim) #paraview cracked facet file
 cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
 mat_elas = elastic_term(mat_grad, passage_ccG_to_CR)
-mat_pen,mat_jump_1,mat_jump_2 = penalty_term(nb_ddl_ccG, mesh, d, dim, mat_grad, passage_ccG_to_CR, G, nb_ddl_CR)
+mat_pen,mat_jump_1,mat_jump_2 = penalty_term(nb_ddl_ccG, mesh, d, dim, mat_grad, passage_ccG_to_CR, G, nb_ddl_CR, nz_vec_BC)
 A = mat_elas + mat_pen
 L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
+
+#Updating potentially breaking facets
+potentially_cracking_facets = set()
+for f in cracked_facets:
+    potentially_cracking_facets |= facet_to_facet.get(f) #updating set
+
+#Imposing strongly Dirichlet BC
+A_D = mat_D * A * mat_D.T
+A_not_D = mat_not_D * A * mat_not_D.T
+B = mat_not_D * A * mat_D.T
 
 ##Homogeneous Neumann BC on new crack lips
 #for f in cracked_facets:
@@ -254,24 +273,27 @@ while u_D.t < T:
         #if u_D.t % (T / 10) < dt:
         #solution_u_DG.vector().set_local(vec_u_DG)
         #solution_u_DG.vector().apply("insert")
-        #file.write(solution_u_DG, normal_stress_BC.t)
+        #file.write(solution_u_DG, u_D.t)
         #solution_stress.vector().set_local(stresses)
         #solution_stress.vector().apply("insert")
-        #file.write(solution_stress, normal_stress_BC.t)
+        #file.write(solution_stress, u_D.t)
         #sys.exit()
 
         #Cracking criterion
         stress_per_facet = average_stresses * mat_grad * vec_u_CR #plain stress
-        Gh = stress_per_facet * stress_per_facet
-        Gh *= 0.5 * np.pi / mu * areas
+        stress_per_facet = stress_per_facet.reshape((initial_nb_ddl_CR // d,d)) #For vectorial case
+        #Gh = stress_per_facet * stress_per_facet
+        Gh = np.sum(stress_per_facet * stress_per_facet, axis=1)
+        Gh *= np.pi / E * areas
         #removing energy of already cracked facets
         Gh[list(cracked_facets)] = np.zeros(len(cracked_facets))
 
         #breaking one facet at a time
+        cracking_facets = set()
         args = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         for f in args: 
             assert f not in cracked_facets
-            if Gh[f] > Gc and f in potentially_cracking_facets: #otherwise not cracking !
+            if Gh[f] > Gc and f in potentially_cracking_facets and len(facet_num.get(f)) == 2: #otherwise not cracking !
                 #Verifying that it is the only facet of two cells to break
                 c1,c2 = facet_num.get(f)
                 test_1 = cracked_facets & facets_cell.get(c1)
@@ -291,10 +313,10 @@ while u_D.t < T:
             #outputs
             solution_u_DG.vector().set_local(vec_u_DG)
             solution_u_DG.vector().apply("insert")
-            file.write(solution_u_DG, normal_stress_BC.t)
-            solution_stress.vector().set_local(stresses)
+            file.write(solution_u_DG, u_D.t)
+            solution_stress.vector().set_local(mat_stress * mat_grad * vec_u_CR)
             solution_stress.vector().apply("insert")
-            file.write(solution_stress, normal_stress_BC.t)
+            file.write(solution_stress, u_D.t)
 
         #get correspondance between dof
         for f in cracking_facets:

@@ -22,10 +22,10 @@ Ll, l0, H = 5., 1., 1.
 #folder = 'no_initial_crack'
 folder = 'unstructured'
 #h = H / size_ref
-size_ref = 3
-mesh = Mesh('mesh/test.xml') #3
-#size_ref = 2
-#mesh = Mesh('mesh/cracked_plate_fine.xml')
+#size_ref = 3
+#mesh = Mesh('mesh/test.xml') #3
+size_ref = 2
+mesh = Mesh('mesh/cracked_plate_fine.xml')
 #size_ref = 1
 #mesh = Mesh('mesh/cracked_plate_coarse.xml')
 h = mesh.hmax()
@@ -196,7 +196,7 @@ A_not_D = mat_not_D * A * mat_not_D.T
 B = mat_not_D * A * mat_D.T
 
 #definition of time-stepping parameters
-T = 1. / k #1. / k
+T = 2. / k #1. / k
 chi = 4.5
 dt = h / (k * chi)
 #print(dt)
@@ -261,12 +261,14 @@ while u_D.t < T:
             #print('Facet G: %.5e' % Gh[f])
             c1,c2 = facet_num.get(f)
             normal = G[c1][c2]['normal']
+            dist_1 = np.linalg.norm(G.node[c1]['pos'] - G[c1][c2]['barycentre'])
+            dist_2 = np.linalg.norm(G.node[c2]['pos'] - G[c1][c2]['barycentre'])
             stress_1 = np.dot(stress_per_cell[c1],normal)
             stress_2 = np.dot(stress_per_cell[c2],normal)
             G1 = stress_1 * stress_1
-            G1 *= 0.5 * np.pi / mu * areas[f] #areas is not exact be that will do
+            G1 *= np.pi / mu * dist_1 #areas is not exact be that will do
             G2 = stress_2 * stress_2
-            G2 *= 0.5 * np.pi / mu * areas[f]
+            G2 *= np.pi / mu * dist_2
             #print('Cell G: %.5e and %.5e' % (G1,G2))
             #assert min(G1,G2) <= Gh[f] <= max(G1,G2)
             Gf_test = np.sqrt(G1*G2) #looks all right...

@@ -17,7 +17,7 @@ k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
 folder = 'structured'
-size_ref = 20 #40 #20 #10
+size_ref = 5 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 #folder = 'no_initial_crack'
 #folder = 'unstructured'
@@ -275,9 +275,25 @@ while u_D.t < T:
                 Gh[f] = np.sqrt(G1*G2) #looks all right...
 
         #Potentially cracking facet with biggest Gh
-        for f in np.argpartition(Gh, -20)[-20:]: #is 20 enough?
-        #f = np.argmax(Gh)
-        #if Gh[f] > Gc and f in potentially_cracking_facets: #otherwise not cracking !
+        #test = np.argpartition(Gh, -20)[-20:]
+        #test_bis = test[np.argsort((-Gh)[test])]
+        #print(test_bis)
+        #print(Gh[test_bis])
+        #sys.exit()
+        idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
+        indices = idx[np.argsort((-Gh)[idx])]
+        #test
+        for f in indices:
+            print(Gh[f])
+            c1,c2 = facet_num.get(f)
+            print(G[c1][c2]['barycentre'])
+        sys.exit()
+        #Real computation
+        for f in indices:
+            ##f = np.argmax(Gh)
+            #print(Gh[f])
+            #c1,c2 = facet_num.get(f)
+            #print(G[c1][c2]['barycentre'])
             if Gh[f] > Gc and f in potentially_cracking_facets: #otherwise not cracking !
                 #Verifying that it is the only facet of two cells to break
                 c1,c2 = facet_num.get(f)

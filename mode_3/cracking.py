@@ -16,16 +16,16 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-#folder = 'structured'
-#size_ref = 5 #40 #20 #10
-#mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
+folder = 'structured'
+size_ref = 20 #40 #20 #10
+mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 #folder = 'no_initial_crack'
-folder = 'unstructured'
+#folder = 'unstructured'
 #h = H / size_ref
 #size_ref = 3
 #mesh = Mesh('mesh/test.xml') #3
-size_ref = 2
-mesh = Mesh('mesh/cracked_plate_fine.xml')
+#size_ref = 2
+#mesh = Mesh('mesh/cracked_plate_fine.xml')
 #size_ref = 1
 #mesh = Mesh('mesh/cracked_plate_coarse.xml')
 h = mesh.hmax()
@@ -200,7 +200,7 @@ T = 2. / k #1. / k
 chi = 4.5
 dt = h / (k * chi)
 #print(dt)
-u_D.t = 0.2 / k #il ne se passe rien avant...
+u_D.t = 0.35 / k #il ne se passe rien avant...
 
 #Début boucle temporelle
 while u_D.t < T:
@@ -251,43 +251,41 @@ while u_D.t < T:
         #Gh *= 0.5 * np.pi / mu * areas
         ##removing energy of already cracked facets
         #Gh[list(cracked_facets)] = np.zeros(len(cracked_facets))
-        #breaking one facet at a time
-        args = np.argpartition(Gh, -20)[-20:] #is 20 enough?
+        ##breaking one facet at a time
+        #args = np.argpartition(Gh, -20)[-20:] #is 20 enough?
+        ##f = np.argmax(Gh)
+        
+        #Computing new Gh
+        Gh = np.zeros(nb_ddl_CR // d)
+        for c1,c2 in G.edges():
+        #for f in range(nb_facet): #Ou boucler sur le graph et ne prendre que les facettes internes ?
+            f = G[c1][c2]['num']
+            if f not in cracked_facets and abs(c1) < nb_ddl_cells // d and abs(c2) < nb_ddl_cells // d:
+                normal = G[c1][c2]['normal']
+                dist_1 = np.linalg.norm(G.node[c1]['pos'] - G[c1][c2]['barycentre'])
+                dist_2 = np.linalg.norm(G.node[c2]['pos'] - G[c1][c2]['barycentre'])
+                stress_1 = np.dot(stress_per_cell[c1],normal)
+                stress_2 = np.dot(stress_per_cell[c2],normal)
+                G1 = stress_1 * stress_1
+                G1 *= np.pi / mu * dist_1 #areas is not exact be that will do
+                G2 = stress_2 * stress_2
+                G2 *= np.pi / mu * dist_2
+                #print('Cell G: %.5e and %.5e' % (G1,G2))
+                #assert min(G1,G2) <= Gh[f] <= max(G1,G2)
+                Gh[f] = np.sqrt(G1*G2) #looks all right...
+
+        #Potentially cracking facet with biggest Gh
+        for f in np.argpartition(Gh, -20)[-20:]: #is 20 enough?
         #f = np.argmax(Gh)
-        
-        #New cracking criterion
-        
-
-        
-        for f in args: 
-            assert f not in cracked_facets
-            #for test
-            #print('Facet G: %.5e' % Gh[f])
-            c1,c2 = facet_num.get(f)
-            normal = G[c1][c2]['normal']
-            dist_1 = np.linalg.norm(G.node[c1]['pos'] - G[c1][c2]['barycentre'])
-            dist_2 = np.linalg.norm(G.node[c2]['pos'] - G[c1][c2]['barycentre'])
-            stress_1 = np.dot(stress_per_cell[c1],normal)
-            stress_2 = np.dot(stress_per_cell[c2],normal)
-            G1 = stress_1 * stress_1
-            G1 *= np.pi / mu * dist_1 #areas is not exact be that will do
-            G2 = stress_2 * stress_2
-            G2 *= np.pi / mu * dist_2
-            #print('Cell G: %.5e and %.5e' % (G1,G2))
-            #assert min(G1,G2) <= Gh[f] <= max(G1,G2)
-            Gf_test = np.sqrt(G1*G2) #looks all right...
-
-            #cracking criterion
-            #if Gh[f] > Gc and f in potentially_cracking_facets: #otherwise not cracking !
-            if Gf_test > Gc and f in potentially_cracking_facets: #otherwise not cracking !
+        #if Gh[f] > Gc and f in potentially_cracking_facets: #otherwise not cracking !
+            if Gh[f] > Gc and f in potentially_cracking_facets: #otherwise not cracking !
                 #Verifying that it is the only facet of two cells to break
                 c1,c2 = facet_num.get(f)
                 test_1 = cracked_facets & facets_cell.get(c1)
                 test_2 = cracked_facets & facets_cell.get(c2)
                 if len(test_1) == 0 and len(test_2) == 0:
                     cracking_facets = {f}
-                    #print(Gh[f])
-                    print(Gf_test)
+                    print(Gh[f])
                     #print(G[c1][c2]['barycentre'])
                     cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
                     potentially_cracking_facets |= facet_to_facet.get(f) #updating set

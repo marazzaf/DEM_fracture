@@ -245,16 +245,20 @@ while u_D.t < T:
         #sys.exit()
 
         cracking_facets = set()
-        #Computing breaking facets
-        stress_per_facet = average_stresses * mat_grad * vec_u_CR #plain stress
-        Gh = stress_per_facet * stress_per_facet
-        Gh *= 0.5 * np.pi / mu * areas
-        #removing energy of already cracked facets
-        Gh[list(cracked_facets)] = np.zeros(len(cracked_facets))
-
+        ##Computing breaking facets
+        #stress_per_facet = average_stresses * mat_grad * vec_u_CR #plain stress
+        #Gh = stress_per_facet * stress_per_facet
+        #Gh *= 0.5 * np.pi / mu * areas
+        ##removing energy of already cracked facets
+        #Gh[list(cracked_facets)] = np.zeros(len(cracked_facets))
         #breaking one facet at a time
         args = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         #f = np.argmax(Gh)
+        
+        #New cracking criterion
+        
+
+        
         for f in args: 
             assert f not in cracked_facets
             #for test

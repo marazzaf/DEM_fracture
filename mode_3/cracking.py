@@ -279,8 +279,10 @@ while u_D.t < T:
                     c1,c2 = facet_num.get(f)
                     c1p = facet_num.get(fp)[0]
                     normal = G[c1p][nb_ddl_cells // d + fp]['normal']
-                    dist_1 = np.linalg.norm(G.node[c1]['pos'] - G[c1][c2]['barycentre'])
-                    dist_2 = np.linalg.norm(G.node[c2]['pos'] - G[c1][c2]['barycentre'])
+                    #dist_1 = np.linalg.norm(G.node[c1]['pos'] - G[c1][c2]['barycentre'])
+                    #dist_2 = np.linalg.norm(G.node[c2]['pos'] - G[c1][c2]['barycentre'])
+                    dist_1 = np.linalg.norm(G.node[c1]['pos'] - G[c1p][nb_ddl_cells // d + fp]['barycentre'])
+                    dist_2 = np.linalg.norm(G.node[c2]['pos'] - G[c1p][nb_ddl_cells // d + fp]['barycentre'])
                     stress_1 = np.dot(stress_per_cell[c1],normal)
                     stress_2 = np.dot(stress_per_cell[c2],normal)
                 G1 = stress_1 * stress_1
@@ -290,11 +292,11 @@ while u_D.t < T:
                 #print('Cell G: %.5e and %.5e' % (G1,G2))
                 #assert min(G1,G2) <= Gh[f] <= max(G1,G2)
                 Gh[f] = np.sqrt(G1*G2) #looks all right...
-                if G[c1][c2]['barycentre'][0] > 1:
-                        print(G[c1][c2]['barycentre'])
-                        print(G1,G2,Gh[f])
+                #if G[c1][c2]['barycentre'][0] > 1:
+                #        print(G[c1][c2]['barycentre'])
+                #        print(G1,G2,Gh[f])
 
-        sys.exit()
+        #sys.exit()
         ##Test another Gh
         #stress_per_facet = average_stresses * mat_grad * vec_u_CR #plain stress
         ##stress_per_facet = stress_per_facet.reshape((initial_nb_ddl_CR // dim, dim))
@@ -311,13 +313,13 @@ while u_D.t < T:
         #sys.exit()
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh)[idx])]
-        #test
-        for f in indices[:5]:
-            print(f)
-            print(Gh[f])
-            c1,c2 = facet_num.get(f)
-            print(G[c1][c2]['barycentre'])
-        sys.exit()
+        ##test
+        #for f in indices[:5]:
+        #    print(f)
+        #    print(Gh[f])
+        #    c1,c2 = facet_num.get(f)
+        #    print(G[c1][c2]['barycentre'])
+        #sys.exit()
         #Real computation
         for f in indices:
             ##f = np.argmax(Gh)

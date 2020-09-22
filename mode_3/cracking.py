@@ -290,7 +290,11 @@ while u_D.t < T:
                 #print('Cell G: %.5e and %.5e' % (G1,G2))
                 #assert min(G1,G2) <= Gh[f] <= max(G1,G2)
                 Gh[f] = np.sqrt(G1*G2) #looks all right...
+                if G[c1][c2]['barycentre'][0] > 1:
+                        print(G[c1][c2]['barycentre'])
+                        print(G1,G2,Gh[f])
 
+        sys.exit()
         ##Test another Gh
         #stress_per_facet = average_stresses * mat_grad * vec_u_CR #plain stress
         ##stress_per_facet = stress_per_facet.reshape((initial_nb_ddl_CR // dim, dim))
@@ -307,14 +311,13 @@ while u_D.t < T:
         #sys.exit()
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh)[idx])]
-        ##test
-        #for f in indices[:5]:
-        #    print(f)
-        #    print(Gh[f])
-        #    print(G_aux[f])
-        #    c1,c2 = facet_num.get(f)
-        #    print(G[c1][c2]['barycentre'])
-        #sys.exit()
+        #test
+        for f in indices[:5]:
+            print(f)
+            print(Gh[f])
+            c1,c2 = facet_num.get(f)
+            print(G[c1][c2]['barycentre'])
+        sys.exit()
         #Real computation
         for f in indices:
             ##f = np.argmax(Gh)

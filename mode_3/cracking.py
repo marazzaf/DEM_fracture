@@ -17,7 +17,7 @@ k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
 folder = 'structured'
-size_ref = 5 #40 #20 #10
+size_ref = 80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 #folder = 'no_initial_crack'
 #folder = 'unstructured'
@@ -146,6 +146,12 @@ A50 = assemble(a50)
 row,col,val = as_backend_type(A50).mat().getValuesCSR()
 average_stresses = sp.csr_matrix((val, col, row))
 
+#jump in facets
+a48 = dot(jump(u_DG),v_CR('+')) / hF('+') * dS
+A48 = assemble(a48)
+row,col,val = as_backend_type(A48).mat().getValuesCSR()
+disp_jumps = sp.csr_matrix((val, col, row))
+
 #facet areas
 f_CR = TestFunction(U_CR)
 areas = assemble(f_CR('+') * (dS + ds)).get_local() #bien écrit !
@@ -270,9 +276,21 @@ while u_D.t < T:
                 G1 *= np.pi / mu * dist_1 #areas is not exact be that will do
                 G2 = stress_2 * stress_2
                 G2 *= np.pi / mu * dist_2
+                #if f == 3388 or f == 3307 or f == 3387:
+                #    print(f)
+                #    print(G1,G2)
+                #    print(stress_1,stress_2,0.5*(stress_1+stress_2))
                 #print('Cell G: %.5e and %.5e' % (G1,G2))
                 #assert min(G1,G2) <= Gh[f] <= max(G1,G2)
                 Gh[f] = np.sqrt(G1*G2) #looks all right...
+
+        #Test another Gh
+        stress_per_facet = average_stresses * mat_grad * vec_u_CR #plain stress
+        #stress_per_facet = stress_per_facet.reshape((initial_nb_ddl_CR // dim, dim))
+        disp_jump = disp_jumps * vec_u_DG
+        #disp_jump = disp_jump.reshap((initial_nb_ddl_CR // dim, dim))
+        #G_aux = 0.5 * np.sum(stress_per_facet * disp_jump, axis=1)
+        G_aux = 0.5 * stress_per_facet * disp_jump
 
         #Potentially cracking facet with biggest Gh
         #test = np.argpartition(Gh, -20)[-20:]
@@ -283,8 +301,10 @@ while u_D.t < T:
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh)[idx])]
         #test
-        for f in indices:
+        for f in indices[:5]:
+            print(f)
             print(Gh[f])
+            print(G_aux[f])
             c1,c2 = facet_num.get(f)
             print(G[c1][c2]['barycentre'])
         sys.exit()

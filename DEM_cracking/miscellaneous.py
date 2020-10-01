@@ -53,7 +53,7 @@ def assemble_volume_load(load, problem):
     return problem.DEM_to_DG.T * L
 
 
-def schur(nb_ddl_cells_, nb_ddl_ccG_):
+def schur_matrices(nb_ddl_cells_, nb_ddl_ccG_):
     aux = list(np.arange(nb_ddl_cells_))
     aux_bis = list(np.arange(nb_ddl_cells_, nb_ddl_ccG_))
 

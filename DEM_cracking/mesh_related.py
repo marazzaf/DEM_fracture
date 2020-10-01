@@ -1,6 +1,8 @@
 # coding: utf-8
 from dolfin import *
-from numpy import array
+import numpy as np
+from scipy.sparse import csr_matrix
+import networkx as nx
 
 def facet_neighborhood(mesh_):
     """Returns a dictionnary containing as key the a modified index for the facet and as values the list of indices of the cells (or cell) containing the facet. """
@@ -13,7 +15,7 @@ def facet_neighborhood(mesh_):
 
     signs = assemble( g_CR('+') * (f_DG('+') / area('+') - f_DG('-') / area('-')) * dS + g_CR('+') * f_DG('+') / area('+') * ds, form_compiler_parameters=None)
     row,col,val = as_backend_type(signs).mat().getValuesCSR()
-    mat_signs = sp.csr_matrix((val, col, row))
+    mat_signs = csr_matrix((val, col, row))
     mat_signs.eliminate_zeros()
     mat_signs = mat_signs.rint()
 
@@ -26,34 +28,24 @@ def facet_neighborhood(mesh_):
     
     return res #just like facet_neighborhood but with everything indexed by the scalar_CR dof and not the index of the facet...
 
-def connectivity_graph(mesh_, d_, penalty_, dirichlet_dofs):    G = nx.Graph()
+def connectivity_graph(problem, dirichlet_dofs):
+    G = nx.Graph()
     count = 0
 
-    #useful mesh entities
-    dim = mesh_.topology().dim()
-    if d_ == 1:
-        U_CR = FunctionSpace(mesh_, 'CR', 1)
-        U_DG = FunctionSpace(mesh_, 'DG', 0)
-    elif d_ >= 2:
-        U_CR = VectorFunctionSpace(mesh_, 'CR', 1)
-        U_DG = VectorFunctionSpace(mesh_, 'DG', 0)
-    nb_ddl_cells = U_DG.dofmap().global_dimension()
-    dofmap_CR = U_CR.dofmap()
-    nb_ddl_CR = dofmap_CR.global_dimension()
+    #For numbers of facets
+    dofmap_CR = problem.CR.dofmap()
 
     #useful auxiliary functions
-    vol_c = CellVolume(mesh_) #Pour volume des particules voisines
-    hF = FacetArea(mesh_)
-    n = FacetNormal(mesh_)
-    scalar_DG = FunctionSpace(mesh_, 'DG', 0) #for volumes
+    vol_c = CellVolume(problem.mesh) #Pour volume des particules voisines
+    hF = FacetArea(problem.mesh)
+    n = FacetNormal(problem.mesh)
+    scalar_DG = FunctionSpace(problem.mesh, 'DG', 0) #for volumes
     f_DG = TestFunction(scalar_DG)
-    scalar_CR = FunctionSpace(mesh_, 'CR', 1) #for surfaces
+    scalar_CR = FunctionSpace(problem.mesh, 'CR', 1) #for surfaces
     f_CR = TestFunction(scalar_CR)
-    vectorial_CR = VectorFunctionSpace(mesh_, 'CR', 1) #for normals
-    v_CR = TestFunction(vectorial_CR)
 
     #assembling penalty factor
-    a_aux = penalty_ * hF / vol_c * f_CR * ds + penalty_ * (2.*hF('+'))/ (vol_c('+') + vol_c('-')) * f_CR('+') * dS
+    a_aux = problem.penalty * hF / vol_c * f_CR * ds + problem.penalty * (2.*hF('+'))/ (vol_c('+') + vol_c('-')) * f_CR('+') * dS
     pen_factor = assemble(a_aux).get_local()
 
     #computation of volumes, surfaces and normals
@@ -61,18 +53,16 @@ def connectivity_graph(mesh_, d_, penalty_, dirichlet_dofs):    G = nx.Graph()
     assert(volumes.min() > 0.)
     areas = assemble(f_CR('+') * (dS + ds)).get_local()
     assert(areas.min() > 0.)
-    normals_aux = assemble( dot(n('-'), v_CR('-')) / hF('-') * dS + dot(n, v_CR) / hF * ds ).get_local() #(dS + ds)
-    normals = normals_aux.reshape((nb_ddl_CR // d_, dim))
 
     #importing cell dofs
-    for c in cells(mesh_): #Importing cells
-        aux = list(np.arange(count, count+d_))
-        count += d_
+    for c in cells(problem.mesh): #Importing cells
+        aux = list(np.arange(count, count+problem.d))
+        count += problem.d
         #computing volume and barycentre of the cell
         vert = []
         vert_ind = []
         for v in vertices(c):
-            vert.append( np.array(v.point()[:])[:dim] )
+            vert.append( np.array(v.point()[:])[:problem.dim] )
             vert_ind.append(v.index())
         vol = volumes[c.index()]
         vert = np.array(vert)
@@ -81,25 +71,24 @@ def connectivity_graph(mesh_, d_, penalty_, dirichlet_dofs):    G = nx.Graph()
         G.add_node(c.index(), dof=aux, pos=bary, measure=vol, vertices=vert, bnd=False) #bnd=True if cell is on boundary of the domain
         
     #importing connectivity and facet dofs
-    for f in facets(mesh_):
+    for f in facets(problem.mesh):
         aux_bis = [] #number of the cells
         for c in cells(f):
             aux_bis.append(c.index())
-        num_global_ddl_facet = dofmap_CR.entity_dofs(mesh_, dim - 1, np.array([f.index()], dtype="uintp")) #number of the dofs in CR
+        num_global_ddl_facet = dofmap_CR.entity_dofs(problem.mesh, problem.dim - 1, np.array([f.index()], dtype="uintp")) #number of the dofs in CR
         #computing quantites related to the facets
         vert = []
         vert_ind = []
         for v in vertices(f):
-            vert.append( np.array(v.point()[:])[:dim] )
+            vert.append( np.array(v.point()[:])[:problem.dim] )
             vert_ind.append(v.index())
-        normal = normals[num_global_ddl_facet[0] // d_, :]
-        area = areas[num_global_ddl_facet[0] // d_]
+        area = areas[num_global_ddl_facet[0] // problem.d]
         #facet barycentre computation
         vert = np.array(vert)
         bary = vert.sum(axis=0) / vert.shape[0]
         #index of the edges of the facet
         Edges = set()
-        if dim == 3:
+        if problem.dim == 3:
             for e in edges(f):
                 Edges.add(e.index())
 
@@ -112,15 +101,15 @@ def connectivity_graph(mesh_, d_, penalty_, dirichlet_dofs):    G = nx.Graph()
             bary_n2 = G.node[n2]['pos']
          
             #adding edge
-            G.add_edge(aux_bis[0],aux_bis[1], num=num_global_ddl_facet[0] // d_, recon=set([]), dof_CR=num_global_ddl_facet, measure=area, barycentre=bary, normal=normal, vertices=vert, edges=Edges, pen_factor=pen_factor[num_global_ddl_facet[0] // d_], breakable=True) #, vertices_ind=vert_ind)
+            G.add_edge(aux_bis[0],aux_bis[1], num=num_global_ddl_facet[0] // problem.d, recon=set([]), dof_CR=num_global_ddl_facet, measure=area, barycentre=bary, vertices=vert, pen_factor=pen_factor[num_global_ddl_facet[0] // problem.d], breakable=True) #, vertices_ind=vert_ind)
             
         elif len(aux_bis) == 1: #add the link between a cell dof and a boundary facet dof
             for c in cells(f): #only one cell contains the boundary facet
                 bary_cell = G.node[c.index()]['pos']
             #computation of volume associated to the facet for mass matrix
-            if dim == 2:
+            if problem.dim == 2:
                 vol_facet = 0.5 * np.linalg.norm(np.cross(vert[0] - bary_cell, vert[1] - bary_cell))
-            elif dim == 3:
+            elif problem.dim == 3:
                 vol_facet = np.linalg.norm(np.dot( np.cross(vert[0] - bary_cell, vert[1] - bary_cell), vert[2] - bary_cell )) / 6.
 
             #checking if adding "dofs" for Dirichlet BC
@@ -128,11 +117,11 @@ def connectivity_graph(mesh_, d_, penalty_, dirichlet_dofs):    G = nx.Graph()
             aux = list(np.arange(count, count+nb_dofs))
             count += nb_dofs
             components = sorted(list(dirichlet_dofs & set(num_global_ddl_facet)))
-            components = np.array(components) % d_
+            components = np.array(components) % problem.d
             
             #number of the dof is total number of cells + num of the facet
-            G.add_node(nb_ddl_cells // d_ + num_global_ddl_facet[0] // d_, pos=bary, dof=aux, dirichlet_components=components)
-            G.add_edge(aux_bis[0], nb_ddl_cells // d_ + num_global_ddl_facet[0] // d_, num=num_global_ddl_facet[0] // d_, dof_CR=num_global_ddl_facet, measure=area, barycentre=bary, normal=normal, vertices=vert, pen_factor=pen_factor[num_global_ddl_facet[0] // d_], breakable=False)
+            G.add_node(problem.nb_dof_cells // problem.d + num_global_ddl_facet[0] // problem.d, pos=bary, dof=aux, dirichlet_components=components)
+            G.add_edge(aux_bis[0], problem.nb_dof_cells // problem.d + num_global_ddl_facet[0] // problem.d, num=num_global_ddl_facet[0] // problem.d, dof_CR=num_global_ddl_facet, measure=area, barycentre=bary, vertices=vert, pen_factor=pen_factor[num_global_ddl_facet[0] // problem.d], breakable=False)
             G.node[aux_bis[0]]['bnd'] = True #Cell is on the boundary of the domain
                 
     return G

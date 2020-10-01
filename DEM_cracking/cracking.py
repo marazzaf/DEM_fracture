@@ -199,5 +199,65 @@ def out_cracked_facets(folder,num_computation, num_output, cracked_facets_vertic
     crack.close()
     return
 
+def local_gradient_matrix(num_cell, G_, dim, d_, nb_ddl_CR):
+    res = sp.lil_matrix((d_ * dim, nb_ddl_CR))
+    bary_cell = G_.node[num_cell]['pos']
+    vol = G_.node[num_cell]['measure']
+    for (u,v) in nx.edges(G_, nbunch=num_cell): #getting facets of the cell (in edges)
+        f = G_[u][v] #edge corresponding to the facet
+        normal = f['normal']
+        normal = normal * np.sign( np.dot(normal, f['barycentre'] - bary_cell) ) #getting the outer normal to the facet with respect to the cell
+        dofs = f['dof_CR'] #getting the right number of the dof corresponding to the facet
+        aux = np.zeros((d_ * dim, d_)) #local contribution to the gradient for facet
+        if d_ > 1: #vectorial problem
+            for k in range(d_):
+                for j in range(d_):
+                    aux[k*dim+j,k] = normal[j]
+        else: #scalar problem
+            for i in range(len(normal)):
+                aux[i,0] = normal[i]
+        aux = f['measure'] / vol * aux
+        
+        res[:, dofs[0] : dofs[d_-1] + 1] = aux #importation dans la matrice locale de la cellule
+    return res
+
+def removing_penalty(mesh_, d_, dim_, nb_ddl_ccG_, mat_grad_, passage_ccG_CR_, G_, nb_ddl_CR_, cracking_facets, facet_num):
+    if d_ >= 2:
+        U_DG = VectorFunctionSpace(mesh_, 'DG', 0)
+        tens_DG_0 = TensorFunctionSpace(mesh_, 'DG', 0)
+    else:
+        U_DG = FunctionSpace(mesh_, 'DG', 0)
+        tens_DG_0 = VectorFunctionSpace(mesh_, 'DG', 0)
+        
+    nb_ddl_cells = U_DG.dofmap().global_dimension()
+    dofmap_tens_DG_0 = tens_DG_0.dofmap()
+    nb_ddl_grad = dofmap_tens_DG_0.global_dimension()
+
+    #creating jump matrix
+    mat_jump_1 = sp.dok_matrix((nb_ddl_CR_,nb_ddl_ccG_))
+    mat_jump_2 = sp.dok_matrix((nb_ddl_CR_,nb_ddl_grad))
+
+    for f in cracking_facets: #utiliser facet_num pour avoir les voisins ?
+        assert(len(facet_num.get(f)) == 2)
+        c1,c2 = facet_num.get(f) #must be two otherwise external facet broke
+        num_global_ddl = G_[c1][c2]['dof_CR']
+        coeff_pen = G_[c1][c2]['pen_factor']
+        pos_bary_facet = G_[c1][c2]['barycentre'] #position barycentre of facet
+        #filling-in the DG 0 part of the jump
+        mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,d_ * c1 : (c1+1) * d_] = np.sqrt(coeff_pen)*np.eye(d_)
+        mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,d_ * c2 : (c2+1) * d_] = -np.sqrt(coeff_pen)*np.eye(d_)
+
+        for num_cell,sign in zip([c1,c2],[1., -1.]):
+            #filling-in the DG 1 part of the jump...
+            pos_bary_cell = G_.node[num_cell]['pos']
+            diff = pos_bary_facet - pos_bary_cell
+            pen_diff = np.sqrt(coeff_pen)*diff
+            tens_dof_position = dofmap_tens_DG_0.cell_dofs(num_cell)
+            for num,dof_CR in enumerate(num_global_ddl):
+                for i in range(dim_):
+                    mat_jump_2[dof_CR,tens_dof_position[(num % d_)*d_ + i]] = sign*pen_diff[i]
+
+    return mat_jump_1.tocsr(), mat_jump_2.tocsr()
+
 def cracking_criterion(problem):
     return 

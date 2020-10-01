@@ -1,7 +1,8 @@
 # coding: utf-8
 import sys
 sys.path.append('../')
-from facets import *
+from dolfin import *
+from DEM_cracking.DEM import DEMProblem
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import cg
 
@@ -17,13 +18,13 @@ k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
 folder = 'structured'
-#size_ref = 20 #40 #20 #10
-#mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
+size_ref = 5 #40 #20 #10
+mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 #folder = 'no_initial_crack'
-folder = 'unstructured'
+#folder = 'unstructured'
 #h = H / size_ref
-size_ref = 3
-mesh = Mesh('mesh/test.xml') #3
+#size_ref = 3
+#mesh = Mesh('mesh/test.xml') #3
 #size_ref = 2
 #mesh = Mesh('mesh/cracked_plate_fine.xml')
 #size_ref = 1
@@ -33,9 +34,6 @@ h = mesh.hmax()
 
 #scalar problem
 d = 1
-
-#Creating the DEM problem
-problem = DEMProblem(mesh, d, penalty)
 
 # Sub domain for BC
 def upper_left(x, on_boundary):
@@ -58,35 +56,10 @@ clamped_boundary = AutoSubDomain(right)
 clamped_boundary.mark(bnd_facets, 45)
 ds = Measure('ds')(subdomain_data=bnd_facets)
 
-# Mesh-related functions
-vol = CellVolume(mesh) #Pour volume des particules voisines
-hF = FacetArea(mesh)
-h_avg = (vol('+') + vol('-'))/ (2. * hF('+'))
-n = FacetNormal(mesh)
-
-#useful
-solution_u_DG = Function(problem.DG_0,  name="disp DG")
-solution_stress = Function(problem.W, name="Stress")
-
-#reference solution
-x = SpatialCoordinate(mesh)
-#Dirichlet BC
-u_D = Expression('x[1]/fabs(x[1]) * k * t * H * (1 - x[0]/L)', L=Ll, H=H, k=k, t=0, degree=2)
-
-#Load and non-homogeneous Dirichlet BC
-def eps(v): #v is a gradient matrix
-    return v
-
-def sigma(eps_el):
-    return mu * eps_el
-
 # Define variational problem
-u_CR = TrialFunction(U_CR)
+U_CR = FunctionSpace(mesh, 'CR', 1)
+hF = FacetArea(mesh)
 v_CR = TestFunction(U_CR)
-u_DG = TrialFunction(U_DG)
-v_DG = TestFunction(U_DG)
-Du_DG = TrialFunction(W)
-Dv_DG = TestFunction(W)
 
 #new for BC
 l4 = v_CR('+') / hF * (ds(41) + ds(42) + ds(45))
@@ -94,6 +67,11 @@ L4 = assemble(l4)
 vec_BC = L4.get_local()
 nz_vec_BC = list(vec_BC.nonzero()[0])
 nz_vec_BC = set(nz_vec_BC)
+
+#Creating the DEM problem
+problem = DEMProblem(mesh, d, penalty, nz_vec_BC)
+
+sys.exit()
 
 #Cell-centre Galerkin reconstruction
 coord_bary,coord_num = smallest_convexe_bary_coord(mesh,facet_num,d,G)
@@ -131,6 +109,22 @@ disp_jumps = sp.csr_matrix((val, col, row))
 #facet areas
 f_CR = TestFunction(U_CR)
 areas = assemble(f_CR('+') * (dS + ds)).get_local() #bien écrit !
+
+#useful
+solution_u_DG = Function(problem.DG_0,  name="disp DG")
+solution_stress = Function(problem.W, name="Stress")
+
+#reference solution
+x = SpatialCoordinate(mesh)
+#Dirichlet BC
+u_D = Expression('x[1]/fabs(x[1]) * k * t * H * (1 - x[0]/L)', L=Ll, H=H, k=k, t=0, degree=2)
+
+#Load and non-homogeneous Dirichlet BC
+def eps(v): #v is a gradient matrix
+    return v
+
+def sigma(eps_el):
+    return mu * eps_el
 
 #Homogeneous Neumann BC
 L = np.zeros(nb_ddl_CR)

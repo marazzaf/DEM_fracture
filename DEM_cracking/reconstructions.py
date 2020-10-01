@@ -2,7 +2,7 @@
 import scipy.sparse as sp
 from dolfin import *
 from numpy import array,arange,append
-from DEM.mesh_related import *
+from DEM_cracking.mesh_related import *
 from itertools import combinations
 
 def DEM_to_DG_matrix(problem):
@@ -65,52 +65,45 @@ def gradient_matrix(problem):
 
 
 def DEM_to_CR_matrix(problem):
-    dofmap_CR = problem.CR.dofmap()
-    nb_total_dof_CR = dofmap_CR.global_dimension()
-
-    #computing the facet reconstructions
-    
-    
     #Computing the facet reconstructions
-    convex_num,convex_coord = facet_interpolation(facet_num,pos_bary_cells,pos_ddl_vertex,dico_pos_bary_faces,problem.dim,problem.d)
+    convex_num,convex_coord = facet_interpolation(problem)
 
     #Storing the facet reconstructions in a matrix
-    matrice_resultat = sp.dok_matrix((nb_total_dof_CR,nb_dof_ccG)) #Matrice vide.
-    for f in facets(problem.mesh):
-        num_global_face = f.index()
-        num_global_ddl = dofmap_CR.entity_dofs(problem.mesh, problem.dim - 1, array([num_global_face], dtype="uintp"))
-        convexe_f = convex_num.get(num_global_face)
-        convexe_c = convex_coord.get(num_global_face)
+    complete_matrix = sp.dok_matrix((nb_total_dof_CR,nb_ddl_ccG_)) #Empty matrix.
+    trace_matrix = sp.dok_matrix((nb_total_dof_CR,nb_ddl_ccG_)) #Empty matrix.
+    
+    for x,y in G_.edges(): #looping through all facets of the mesh
+        num_global_face = G_[x][y]['num']
+        num_global_ddl = G_[x][y]['dof_CR']
+        convexe_f = conv_num.get(num_global_face)
+        convexe_c = conv_coord.get(num_global_face)
 
-        if convexe_f != None: #Face interne, on interpolle la valeur !
+        Y = max(x,y)
+
+        if abs(Y) >= nb_ddl_cells // d_ and len(G_.node[Y]['dof']) > 0: #facet holds Dirichlet dof
+            dof = G_.node[Y]['dof']
+            dirichlet_components = G_.node[Y]['dirichlet_components']
+            count = 0
+            for num,dof_CR in enumerate(num_global_ddl):
+                if num in dirichlet_components:
+                    trace_matrix[dof_CR,dof[count]] = 1.
+                    complete_matrix[dof_CR,dof[count]] = 1.
+                    count += 1
+                    
             for i,j in zip(convexe_f,convexe_c):
-                matrice_resultat[num_global_ddl[0],i[0]] = j
-                if problem.d >= 2:
-                    matrice_resultat[num_global_ddl[1],i[1]] = j
-                if problem.d == 3:
-                    matrice_resultat[num_global_ddl[2],i[2]] = j
-        else: #Face sur le bord, on interpolle la valeur avec les valeurs aux vertex
-            pos_init = vertex_associe_face.get(num_global_face)
-            v1 = num_ddl_vertex[pos_init[0]]
-            v2 = num_ddl_vertex[pos_init[1]]
-            if problem.dim == 2:
-                matrice_resultat[num_global_ddl[0], v1[0]] = 0.5
-                matrice_resultat[num_global_ddl[0], v2[0]] = 0.5
-                if problem.d == 2: #pb vectoriel
-                    matrice_resultat[num_global_ddl[1], v1[1]] = 0.5
-                    matrice_resultat[num_global_ddl[1], v2[1]] = 0.5
-            if problem.dim == 3:
-                v3 = num_ddl_vertex[pos_init[2]]
-                matrice_resultat[num_global_ddl[0], v1[0]] = 1./3.
-                matrice_resultat[num_global_ddl[0], v2[0]] = 1./3.
-                matrice_resultat[num_global_ddl[0], v3[0]] = 1./3.
-                if problem.d >= 2: #deuxième ligne
-                    matrice_resultat[num_global_ddl[1], v1[1]] = 1./3.
-                    matrice_resultat[num_global_ddl[1], v2[1]] = 1./3.
-                    matrice_resultat[num_global_ddl[1], v3[1]] = 1./3.
-                if problem.d == 3: #troisième ligne
-                    matrice_resultat[num_global_ddl[2], v1[2]] = 1./3.
-                    matrice_resultat[num_global_ddl[2], v2[2]] = 1./3.
-                    matrice_resultat[num_global_ddl[2], v3[2]] = 1./3.
+                if 0 not in G_.node[Y]['dirichlet_components']:
+                    complete_matrix[num_global_ddl[0],i[0]] += j #because a single dof can be used twice with new symetric reconstruction
+                if d_ >=2 and 1 not in G_.node[Y]['dirichlet_components']:
+                    complete_matrix[num_global_ddl[1],i[1]] += j
+                if d_ == 3 and 2 not in G_.node[Y]['dirichlet_components']:
+                    complete_matrix[num_global_ddl[2],i[2]] += j
+        else: #facet holds no Dirichlet dofs
+            for i,j in zip(convexe_f,convexe_c):
+                complete_matrix[num_global_ddl[0],i[0]] += j #because a single dof can be used twice with new symetric reconstruction
+                if d_ >= 2:
+                    complete_matrix[num_global_ddl[1],i[1]] += j
+                if d_ == 3:
+                    complete_matrix[num_global_ddl[2],i[2]] += j
+            
         
-    return matrice_resultat.tocsr()
+    return complete_matrix.tocsr(), trace_matrix.tocsr()

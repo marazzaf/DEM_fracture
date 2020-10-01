@@ -3,7 +3,7 @@
 from dolfin import *
 from scipy.sparse import csr_matrix,dok_matrix
 import numpy as np
-from DEM_cracking.reconstructions import compute_all_reconstruction_matrices,gradient_matrix
+from DEM_cracking.reconstructions import *
 from DEM_cracking.mesh_related import *
 from DEM_cracking.miscellaneous import Dirichlet_BC,schur_matrices
 
@@ -48,24 +48,24 @@ class DEMProblem:
         #DEM reconstructions
         self.DEM_to_DG = matrice_passage_ccG_DG(nb_ddl_cells,nb_ddl_ccG)
         self.DEM_to_CR,self.trace_matrix = matrice_passage_ccG_CR(problem)
-        passage_ccG_to_DG_1,ccG_to_DG_1_aux_1,ccG_to_DG_1_aux_2 = matrice_passage_ccG_DG_1(mesh, nb_ddl_ccG, d, dim, mat_grad, passage_ccG_to_CR)
-        print('Reconstruction matrices ok!')
-
-        #Dirichlet conditions
-
-    def for_dirichlet(self, A, boundary_dirichlet=None):
-        hF = FacetArea(self.mesh)
-        v_CG = TestFunction(self.CG)
-        if boundary_dirichlet == None: #dependence on self.d ???
-            form_dirichlet = inner(v_CG('+'),as_vector((1.,1.))) / hF * ds
-        else:
-            form_dirichlet = inner(v_CG('+'),as_vector((1.,1.))) / hF * ds(boundary_dirichlet)
-        A_BC = Dirichlet_BC(form_dirichlet, self.DEM_to_CG)
-        self.mat_not_D,self.mat_D = schur_matrices(A_BC)
-        #A_D = mat_D * A * mat_D.T
-        A_not_D = self.mat_not_D * A * self.mat_not_D.T
-        B = self.mat_not_D * A * self.mat_D.T
-        return A_not_D,B
+#        passage_ccG_to_DG_1,ccG_to_DG_1_aux_1,ccG_to_DG_1_aux_2 = matrice_passage_ccG_DG_1(mesh, nb_ddl_ccG, d, dim, mat_grad, passage_ccG_to_CR)
+#        print('Reconstruction matrices ok!')
+#
+#        #Dirichlet conditions
+#
+#    def for_dirichlet(self, A, boundary_dirichlet=None):
+#        hF = FacetArea(self.mesh)
+#        v_CG = TestFunction(self.CG)
+#        if boundary_dirichlet == None: #dependence on self.d ???
+#            form_dirichlet = inner(v_CG('+'),as_vector((1.,1.))) / hF * ds
+#        else:
+#            form_dirichlet = inner(v_CG('+'),as_vector((1.,1.))) / hF * ds(boundary_dirichlet)
+#        A_BC = Dirichlet_BC(form_dirichlet, self.DEM_to_CG)
+#        self.mat_not_D,self.mat_D = schur_matrices(A_BC)
+#        #A_D = mat_D * A * mat_D.T
+#        A_not_D = self.mat_not_D * A * self.mat_not_D.T
+#        B = self.mat_not_D * A * self.mat_D.T
+#        return A_not_D,B
 
 
 def elastic_bilinear_form(mesh_, d_, DEM_to_CR_matrix, sigma=grad, eps=grad):

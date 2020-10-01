@@ -4,7 +4,6 @@ from dolfin import *
 from numpy import array,arange,append
 from DEM_cracking.mesh_related import *
 from DEM_cracking.facet_reconstruction import *
-from itertools import combinations
 
 def DEM_to_DG_matrix(problem):
     """Creates a csr companion matrix to get the cells values of a DEM vector."""
@@ -55,23 +54,23 @@ def matrice_passage_ccG_DG_1(mesh_, nb_ddl_ccG_, d_, dim_, mat_grad_, passage_cc
 
 def DEM_to_CR_matrix(problem):
     #Computing the facet reconstructions
-    convex_num,convex_coord = facet_reconstruction(problem)
+    convex_coord,convex_num = facet_reconstruction(problem)
 
     #Storing the facet reconstructions in a matrix
-    complete_matrix = sp.dok_matrix((nb_total_dof_CR,nb_ddl_ccG_)) #Empty matrix.
-    trace_matrix = sp.dok_matrix((nb_total_dof_CR,nb_ddl_ccG_)) #Empty matrix.
+    complete_matrix = sp.dok_matrix((problem.nb_dof_CR,problem.nb_dof_DEM)) #Empty matrix.
+    trace_matrix = sp.dok_matrix((problem.nb_dof_CR,problem.nb_dof_DEM)) #Empty matrix.
     
-    for x,y in G_.edges(): #looping through all facets of the mesh
-        num_global_face = G_[x][y]['num']
-        num_global_ddl = G_[x][y]['dof_CR']
-        convexe_f = conv_num.get(num_global_face)
-        convexe_c = conv_coord.get(num_global_face)
+    for x,y in problem.Graph.edges(): #looping through all facets of the mesh
+        num_global_face = problem.Graph[x][y]['num']
+        num_global_ddl = problem.Graph[x][y]['dof_CR']
+        convexe_f = convex_num.get(num_global_face)
+        convexe_c = convex_coord.get(num_global_face)
 
         Y = max(x,y)
 
-        if abs(Y) >= nb_ddl_cells // d_ and len(G_.node[Y]['dof']) > 0: #facet holds Dirichlet dof
-            dof = G_.node[Y]['dof']
-            dirichlet_components = G_.node[Y]['dirichlet_components']
+        if abs(Y) >= problem.nb_dof_cells // problem.d and len(problem.Graph.node[Y]['dof']) > 0: #facet holds Dirichlet dof
+            dof = problem.Graph.node[Y]['dof']
+            dirichlet_components = problem.Graph.node[Y]['dirichlet_components']
             count = 0
             for num,dof_CR in enumerate(num_global_ddl):
                 if num in dirichlet_components:
@@ -80,18 +79,18 @@ def DEM_to_CR_matrix(problem):
                     count += 1
                     
             for i,j in zip(convexe_f,convexe_c):
-                if 0 not in G_.node[Y]['dirichlet_components']:
+                if 0 not in problem.Graph.node[Y]['dirichlet_components']:
                     complete_matrix[num_global_ddl[0],i[0]] += j #because a single dof can be used twice with new symetric reconstruction
-                if d_ >=2 and 1 not in G_.node[Y]['dirichlet_components']:
+                if problem.d >=2 and 1 not in problem.Graph.node[Y]['dirichlet_components']:
                     complete_matrix[num_global_ddl[1],i[1]] += j
-                if d_ == 3 and 2 not in G_.node[Y]['dirichlet_components']:
+                if problem.d == 3 and 2 not in problem.Graph.node[Y]['dirichlet_components']:
                     complete_matrix[num_global_ddl[2],i[2]] += j
         else: #facet holds no Dirichlet dofs
             for i,j in zip(convexe_f,convexe_c):
                 complete_matrix[num_global_ddl[0],i[0]] += j #because a single dof can be used twice with new symetric reconstruction
-                if d_ >= 2:
+                if problem.d >= 2:
                     complete_matrix[num_global_ddl[1],i[1]] += j
-                if d_ == 3:
+                if problem.d == 3:
                     complete_matrix[num_global_ddl[2],i[2]] += j
             
         

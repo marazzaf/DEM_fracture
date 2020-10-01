@@ -1,5 +1,7 @@
 #coding: utf-8
-#from DEM_cracking.DEM import *
+import networkx as nx
+import numpy as np
+from itertools import combinations
 import sys
 
 def facet_reconstruction(problem):
@@ -12,7 +14,7 @@ def facet_reconstruction(problem):
     for f in problem.facet_num.keys():
         coord_bary,coord_num,connectivity_recon = bary_coord(f,problem)
         #Chacking computed reconstruction is correct
-        assert len(coord_bary) == len(coord_num) == problem.dim + 1
+        assert len(coord_bary) == len(coord_num)
         try:
             assert(max(abs(coord_bary)) < 100.)
         except AssertionError:
@@ -39,13 +41,13 @@ def bary_coord(num_facet, problem):
         #first set of neighbors
         path_1 = nx.neighbors(problem.Graph, c1)
         path_1 = np.array(list(path_1))
-        for_deletion = np.where(np.absolute(path_1) >= problem.nb_dof_cells_ // problem.d)
+        for_deletion = np.where(np.absolute(path_1) >= problem.nb_dof_cells // problem.d)
         path_1[for_deletion] = -1
         path_1 = set(path_1) - {-1,c2}
         #second set of neighbors
         path_2 = nx.neighbors(problem.Graph, c2)
         path_2 = np.array(list(path_2))
-        for_deletion = np.where(np.absolute(path_2) >= problem.nb_dof_cells_ // problem.d)
+        for_deletion = np.where(np.absolute(path_2) >= problem.nb_dof_cells // problem.d)
         path_2[for_deletion] = -1
         path_2 = set(path_2) - {-1,c1}
         nei_to_nei = path_1 | path_2 #cells that are neighbour to c1 or c2 (excluding c1 and c2 and bnd facets...)
@@ -75,7 +77,7 @@ def bary_coord(num_facet, problem):
 
         #Averaging the barycentric coordinate if required
         if len(coords) > 0:
-            chosen_coord_bary = coords / (len(coords) / (dim_+1))
+            chosen_coord_bary = coords / (len(coords) / (problem.dim+1))
             assert abs(chosen_coord_bary.sum() - 1.) < 1.e-5
         
             #getting dofs used in the CR reconstruction
@@ -109,22 +111,22 @@ def bary_coord(num_facet, problem):
     elif len(j) == 1: #facet is on boundary
         c1 = j[0]
         if num_facet >= 0:
-            x = problem.Graph[c1][num_facet + problem.nb_dof_cells_ // problem.d]['barycentre'] #position du barycentre de la face
-            neigh_c1 = set(nx.neighbors(problem.Graph, c1)) - {num_facet + problem.nb_dof_cells_ // problem.d}
-            nei_to_nei = set(nx.single_source_shortest_path(problem.Graph, c1, cutoff=2)) - {num_facet + problem.nb_dof_cells_ // problem.d}
+            x = problem.Graph[c1][num_facet + problem.nb_dof_cells // problem.d]['barycentre'] #position du barycentre de la face
+            neigh_c1 = set(nx.neighbors(problem.Graph, c1)) - {num_facet + problem.nb_dof_cells // problem.d}
+            nei_to_nei = set(nx.single_source_shortest_path(problem.Graph, c1, cutoff=2)) - {num_facet + problem.nb_dof_cells // problem.d}
         else:
-            x = problem.Graph[c1][num_facet - problem.nb_dof_cells_ // problem.d]['barycentre'] #position du barycentre de la face
-            neigh_c1 = set(nx.neighbors(problem.Graph, c1)) - {num_facet - problem.nb_dof_cells_ // problem.d}
-            nei_to_nei = set(nx.single_source_shortest_path(problem.Graph, c1, cutoff=2)) - {num_facet - problem.nb_dof_cells_ // problem.d}
+            x = problem.Graph[c1][num_facet - problem.nb_dof_cells // problem.d]['barycentre'] #position du barycentre de la face
+            neigh_c1 = set(nx.neighbors(problem.Graph, c1)) - {num_facet - problem.nb_dof_cells // problem.d}
+            nei_to_nei = set(nx.single_source_shortest_path(problem.Graph, c1, cutoff=2)) - {num_facet - problem.nb_dof_cells // problem.d}
 
         #Retirer les facettes de bord de nei_to_nei et neigh_c1...
         neigh_c1 = np.array(list(neigh_c1))
-        for_deletion = np.where(np.absolute(neigh_c1) >= problem.nb_dof_cells_ // problem.d)
+        for_deletion = np.where(np.absolute(neigh_c1) >= problem.nb_dof_cells // problem.d)
         neigh_c1[for_deletion] = -1
         neigh_c1 = set(neigh_c1) - {-1}
 
         nei_to_nei = np.array(list(nei_to_nei))
-        for_deletion = np.where(np.absolute(nei_to_nei) >= problem.nb_dof_cells_ // problem.d)
+        for_deletion = np.where(np.absolute(nei_to_nei) >= problem.nb_dof_cells // problem.d)
         nei_to_nei[for_deletion] = -1
         nei_to_nei = set(nei_to_nei) - {-1}
 
@@ -132,16 +134,16 @@ def bary_coord(num_facet, problem):
         fragment = False
         count = 0
         for n in neigh_c1:
-            if abs(n) >= problem.nb_dof_cells_ // problem.d: #node represents a second facet on the boundary
+            if abs(n) >= problem.nb_dof_cells // problem.d: #node represents a second facet on the boundary
                 count += 1
-        if count >= dim_:
+        if count >= problem.dim:
             fragment = True
 
         if fragment: #single cell detaches.
             if num_facet > 0:
-                dof_CR = problem.Graph[c1][num_facet + problem.nb_dof_cells_ // problem.d]['dof_CR']
+                dof_CR = problem.Graph[c1][num_facet + problem.nb_dof_cells // problem.d]['dof_CR']
             else:
-                dof_CR = problem.Graph[c1][num_facet - problem.nb_dof_cells_ // problem.d]['dof_CR']
+                dof_CR = problem.Graph[c1][num_facet - problem.nb_dof_cells // problem.d]['dof_CR']
             chosen_coord_bary = [np.ones(problem.d)]
             coord_num = [problem.Graph.node[c1]['dof']]
             aux_aux = set()
@@ -151,7 +153,7 @@ def bary_coord(num_facet, problem):
             coord_num = []
             aux_aux = set()
 
-            for dof_num in combinations(nei_to_nei, dim_+1): #test reconstruction with a set of right size
+            for dof_num in combinations(nei_to_nei, problem.dim+1): #test reconstruction with a set of right size
                 list_positions = []   
                 for l in dof_num:
                     list_positions.append(problem.Graph.node[l]['pos'])

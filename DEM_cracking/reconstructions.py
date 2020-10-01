@@ -3,12 +3,13 @@ import scipy.sparse as sp
 from dolfin import *
 from numpy import array,arange,append
 from DEM_cracking.mesh_related import *
+from DEM_cracking.facet_reconstruction import *
 from itertools import combinations
 
 def DEM_to_DG_matrix(problem):
     """Creates a csr companion matrix to get the cells values of a DEM vector."""
 
-    return sp.eye(problem.nb_cell_dofs, n = problem.nb_dof_DEM, format='csr')
+    return sp.eye(problem.nb_dof_cells, n = problem.nb_dof_DEM, format='csr')
 
 def matrice_passage_ccG_DG_1(mesh_, nb_ddl_ccG_, d_, dim_, mat_grad_, passage_ccG_CR):
     if d_ == 1:
@@ -51,22 +52,10 @@ def matrice_passage_ccG_DG_1(mesh_, nb_ddl_ccG_, d_, dim_, mat_grad_, passage_cc
     matrice_resultat_2 = matrice_resultat_2.tocsr()
     return (matrice_resultat_1 +  matrice_resultat_2 * mat_grad_ * passage_ccG_CR), matrice_resultat_1, matrice_resultat_2
 
-def gradient_matrix(problem):
-    """Creates a matrix computing the cell-wise gradient from the facet values stored in a Crouzeix-raviart FE vector."""
-    vol = CellVolume(problem.mesh)
-
-    #variational form gradient
-    u_CR = TrialFunction(problem.CR)
-    Dv_DG = TestFunction(problem.W)
-    a = inner(grad(u_CR), Dv_DG) / vol * dx
-    A = assemble(a)
-    row,col,val = as_backend_type(A).mat().getValuesCSR()
-    return sp.csr_matrix((val, col, row))
-
 
 def DEM_to_CR_matrix(problem):
     #Computing the facet reconstructions
-    convex_num,convex_coord = facet_interpolation(problem)
+    convex_num,convex_coord = facet_reconstruction(problem)
 
     #Storing the facet reconstructions in a matrix
     complete_matrix = sp.dok_matrix((nb_total_dof_CR,nb_ddl_ccG_)) #Empty matrix.

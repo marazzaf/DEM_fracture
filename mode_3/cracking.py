@@ -2,6 +2,7 @@
 import sys
 sys.path.append('../')
 from dolfin import *
+#from DEM_cracking import *
 from DEM_cracking.DEM import DEMProblem
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import cg

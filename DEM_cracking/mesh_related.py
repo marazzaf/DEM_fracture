@@ -126,52 +126,47 @@ def connectivity_graph(problem, dirichlet_dofs):
                 
     return G
 
-def linked_facets(mesh_,dim_,G_): #gives facets sharing a set of codimension 2
+def linked_facets(problem): #gives facets sharing a set of codimension 2
     res = dict()
-    for f in facets(mesh_): #ne pas prendre l'index comme numéro !
+    for f in facets(problem.mesh): #ne pas prendre l'index comme numéro !
         nei = []
         for c in cells(f): #cells neighbouring f
             nei.append(c.index())
         if len(nei) == 2: #for inner facets
-            g = G_[nei[0]][nei[1]]['num'] #c'est le num de la facet pour nous !
+            g = problem.Graph[nei[0]][nei[1]]['num'] #c'est le num de la facet pour nous !
             aux = set()
-            if dim_ == 2:
+            if problem.dim == 2:
                 for v in vertices(f):
                     for fp in facets(v):
                         nei_bis = []
                         for c in cells(fp):
                             nei_bis.append(c.index())
                         if len(nei_bis) == 2: #otherwise it is a boundary facet that cannot break
-                            aux_facet_num = G_[nei_bis[0]][nei_bis[1]]['num']
+                            aux_facet_num = problem.Graph[nei_bis[0]][nei_bis[1]]['num']
                             aux.add(aux_facet_num)
                         
-            elif dim_ == 3:
+            elif problem.dim == 3:
                 for e in edges(f):
                     for fp in facets(e):
                         nei_bis = []
                         for c in cells(fp):
                             nei_bis.append(c.index())
                         if len(nei_bis) == 2: #otherwise it is a boundary facet that cannot break
-                            aux_facet_num = G_[nei_bis[0]][nei_bis[1]]['num']
+                            aux_facet_num = problem.Graph[nei_bis[0]][nei_bis[1]]['num']
                             aux.add(aux_facet_num)
             aux.remove(g)
             res[g] = aux #list #pas f !
     return res
 
-def facets_in_cell(mesh_,d_): #gives facets contained in every cell
-    dim = mesh_.topology().dim()
-    if d_ == 1:
-        U_CR = FunctionSpace(mesh_, 'CR', 1)
-    elif d_ >= 2:
-        U_CR = VectorFunctionSpace(mesh_, 'CR', 1)
-    dofmap_CR = U_CR.dofmap()
+def facets_in_cell(problem): #gives facets contained in every cell
+    dofmap_CR = problem.CR.dofmap()
     
     res = dict()
-    for c in cells(mesh_): 
+    for c in cells(problem.mesh): 
         list_facet_nums = []
         for f in facets(c): #facets contained in c
-            num_global_ddl_facet = dofmap_CR.entity_dofs(mesh_, dim - 1, np.array([f.index()], dtype="uintp"))
-            list_facet_nums.append(num_global_ddl_facet[0] // d_)
+            num_global_ddl_facet = dofmap_CR.entity_dofs(problem.mesh, problem.dim - 1, np.array([f.index()], dtype="uintp"))
+            list_facet_nums.append(num_global_ddl_facet[0] // problem.d)
         res[c.index()] = set(list_facet_nums)
         
     return res

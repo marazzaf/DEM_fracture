@@ -2,7 +2,7 @@
 from dolfin import *
 import numpy as np
 from numpy.linalg import norm
-from scipy.sparse import dok_matrix
+from scipy.sparse import dok_matrix,csr_matrix
 
 def local_project(v, V, u=None):
     """Element-wise projection using LocalSolver"""
@@ -36,6 +36,18 @@ def mass_matrix(mesh_, d_, dim_, rho_, nb_ddl_ccG_):
     res.resize(nb_ddl_ccG_)
 
     return res
+
+def gradient_matrix(problem):
+    """Creates a matrix computing the cell-wise gradient from the facet values stored in a Crouzeix-raviart FE vector."""
+    vol = CellVolume(problem.mesh)
+
+    #variational form gradient
+    u_CR = TrialFunction(problem.CR)
+    Dv_DG = TestFunction(problem.W)
+    a = inner(grad(u_CR), Dv_DG) / vol * dx
+    A = assemble(a)
+    row,col,val = as_backend_type(A).mat().getValuesCSR()
+    return csr_matrix((val, col, row))
 
 def DEM_interpolation(func, problem):
     """Interpolates a function or expression to return a DEM vector containg the interpolation."""

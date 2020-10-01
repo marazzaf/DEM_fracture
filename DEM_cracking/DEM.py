@@ -1,11 +1,11 @@
 # coding: utf-8
-
 from dolfin import *
 from scipy.sparse import csr_matrix,dok_matrix
 import numpy as np
-from DEM_cracking.reconstructions import *
 from DEM_cracking.mesh_related import *
-from DEM_cracking.miscellaneous import Dirichlet_BC,schur_matrices
+from DEM_cracking.reconstructions import *
+#from DEM_cracking.facet_interpolation import *
+from DEM_cracking.miscellaneous import *
 
 class DEMProblem:
     """ Class that will contain the basics of a DEM problem from the mesh and the dimension of the problem to reconstrucion matrices and gradient matrix."""
@@ -46,8 +46,8 @@ class DEMProblem:
         self.facets_cell = facets_in_cell(self)
 
         #DEM reconstructions
-        self.DEM_to_DG = matrice_passage_ccG_DG(nb_ddl_cells,nb_ddl_ccG)
-        self.DEM_to_CR,self.trace_matrix = matrice_passage_ccG_CR(problem)
+        self.DEM_to_DG = DEM_to_DG_matrix(self)
+        self.DEM_to_CR,self.trace_matrix = DEM_to_CR_matrix(self)
 #        passage_ccG_to_DG_1,ccG_to_DG_1_aux_1,ccG_to_DG_1_aux_2 = matrice_passage_ccG_DG_1(mesh, nb_ddl_ccG, d, dim, mat_grad, passage_ccG_to_CR)
 #        print('Reconstruction matrices ok!')
 #

@@ -1,5 +1,5 @@
 #coding: utf-8
-from DEM_cracking.DEM import *
+#from DEM_cracking.DEM import *
 import sys
 
 def facet_reconstruction(problem):

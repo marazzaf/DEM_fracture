@@ -23,3 +23,4 @@ from DEM_cracking.mesh_related import *
 from DEM_cracking.reconstructions import *
 from DEM_cracking.miscellaneous import *
 from DEM_cracking.DEM import *
+from DEM_cracking.cracking import *

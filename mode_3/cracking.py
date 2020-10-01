@@ -29,8 +29,13 @@ mesh = Mesh('mesh/test.xml') #3
 #size_ref = 1
 #mesh = Mesh('mesh/cracked_plate_coarse.xml')
 h = mesh.hmax()
-print(h)
-bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
+#print(h)
+
+#scalar problem
+d = 1
+
+#Creating the DEM problem
+problem = DEMProblem(mesh, d, penalty)
 
 # Sub domain for BC
 def upper_left(x, on_boundary):
@@ -42,6 +47,8 @@ def lower_left(x, on_boundary):
 def right(x, on_boundary):
     return near(x[0], Ll) and on_boundary
 
+#difining boundary
+bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 bnd_facets.set_all(0)
 traction_boundary_1 = AutoSubDomain(upper_left)
 traction_boundary_1.mark(bnd_facets, 41)
@@ -57,34 +64,21 @@ hF = FacetArea(mesh)
 h_avg = (vol('+') + vol('-'))/ (2. * hF('+'))
 n = FacetNormal(mesh)
 
-#Function spaces
-U_DG = FunctionSpace(mesh, 'DG', 0) #Pour déplacement dans cellules
-U_DG_1 = FunctionSpace(mesh, 'DG', 1) #Pour déplacement dans cellules
-U_CR = FunctionSpace(mesh, 'CR', 1) #Pour interpollation dans les faces
-W = VectorFunctionSpace(mesh, 'DG', 0) #, shape=(2,2))
-aux_CR = FunctionSpace(mesh, 'CR', 1) #Pour critère élastique. Reste en FunctionSpace
-W_aux = VectorFunctionSpace(mesh, 'CR', 1) #Exceptionnel pour  cas vectoriel
-
 #useful
-for_dim = Function(U_DG)
-dim = for_dim.geometric_dimension()
-d = 1 #scalar problem
-solution_u_DG = Function(U_DG,  name="disp DG")
-solution_stress = Function(W, name="Stress")
+solution_u_DG = Function(problem.DG_0,  name="disp DG")
+solution_stress = Function(problem.W, name="Stress")
 
 #reference solution
 x = SpatialCoordinate(mesh)
-#quasi-ref solution
 #Dirichlet BC
 u_D = Expression('x[1]/fabs(x[1]) * k * t * H * (1 - x[0]/L)', L=Ll, H=H, k=k, t=0, degree=2)
-#v_D = Expression('x[1]/fabs(x[1]) * k * H * (1 - x[0]/L)', L=Ll, H=H, k=k, t=0, degree=2)
 
 #Load and non-homogeneous Dirichlet BC
 def eps(v): #v is a gradient matrix
     return v
 
 def sigma(eps_el):
-    return mu * eps_el #2.*mu
+    return mu * eps_el
 
 # Define variational problem
 u_CR = TrialFunction(U_CR)
@@ -102,27 +96,9 @@ nz_vec_BC = list(vec_BC.nonzero()[0])
 nz_vec_BC = set(nz_vec_BC)
 
 #Cell-centre Galerkin reconstruction
-nb_ddl_cells = U_DG.dofmap().global_dimension()
-print('nb cell dof : %i' % nb_ddl_cells)
-facet_num = new_facet_neighborhood(mesh)
-nb_ddl_CR = U_CR.dofmap().global_dimension()
-initial_nb_ddl_CR = nb_ddl_CR #will not change. Useful for reducing u_CR for cracking criterion
-nb_facet_original = nb_ddl_CR // d
-print('nb dof CR: %i' % nb_ddl_CR)
-G = connectivity_graph(mesh, d, penalty, nz_vec_BC)
-print('ok graph !')
-nb_ddl_ccG = nb_ddl_cells + len(nz_vec_BC)
 coord_bary,coord_num = smallest_convexe_bary_coord(mesh,facet_num,d,G)
 print('Convexe ok !')
-#matrice gradient
-mat_grad = gradient_matrix(mesh, d)
-print('gradient matrix ok !')
 passage_ccG_to_CR,trace_matrix = matrice_passage_ccG_CR(mesh, coord_num, coord_bary, d, G, nb_ddl_ccG)
-passage_ccG_to_DG = matrice_passage_ccG_DG(nb_ddl_cells,nb_ddl_ccG)
-passage_ccG_to_DG_1,ccG_to_DG_1_aux_1,ccG_to_DG_1_aux_2 = matrice_passage_ccG_DG_1(mesh, nb_ddl_ccG, d, dim, mat_grad, passage_ccG_to_CR)
-facet_to_facet = linked_facets(mesh,dim,G) #designed to lighten research of potentialy failing facets close to a broken facet
-facets_cell = facets_in_cell(mesh,d)
-nb_ddl_grad = W.dofmap().global_dimension()
 mat_not_D,mat_D = schur(nb_ddl_cells, nb_ddl_ccG)
 
 #Variational problem

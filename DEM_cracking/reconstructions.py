@@ -2,54 +2,41 @@
 import scipy.sparse as sp
 from dolfin import *
 from numpy import array,arange,append
-from scipy.spatial import ConvexHull, Delaunay, KDTree
 from DEM.mesh_related import *
-from DEM.errors import *
+from itertools import combinations
 
-def DEM_to_DG_matrix(problem,nb_dof_ccG_):
+def DEM_to_DG_matrix(problem):
     """Creates a csr companion matrix to get the cells values of a DEM vector."""
-    nb_cell_dofs = problem.DG_0.dofmap().global_dimension()
-    return sp.eye(nb_cell_dofs, n = nb_dof_ccG_, format='csr')
 
-def DEM_to_CG_matrix(problem, num_vert_ccG, nb_dof_DEM):
-    """Creates a csr companion matrix to get the boundary vertex values of a DEM vector."""
-    nb_dof_CG = problem.CG.dofmap().global_dimension()
-    matrice_resultat = sp.dok_matrix((nb_dof_CG,nb_dof_DEM)) #Empty matrix
-    vert_to_dof = vertex_to_dof_map(problem.CG)
+    return sp.eye(problem.nb_cell_dofs, n = problem.nb_dof_DEM, format='csr')
 
-    #mettre des 1 à la bonne place dans la matrice...
-    for (i,j),k in zip(num_vert_ccG.items(),range(nb_dof_DEM)): #On boucle sur le numéro des vertex
-        matrice_resultat[vert_to_dof[i*problem.d], j[0]] = 1.
-        if problem.d >= 2:
-            matrice_resultat[vert_to_dof[i*problem.d]+1, j[1]] = 1.
-        if problem.d == 3:
-            matrice_resultat[vert_to_dof[i*problem.d]+2, j[2]] = 1.
-
-    return matrice_resultat.tocsr()
-
-def DEM_to_DG_1_matrix(problem, nb_dof_ccG_, DEM_to_CR):
-    EDG_0 = problem.DG_0
-    EDG_1 = problem.DG_1
-    tens_DG_0 = problem.W
-        
+def matrice_passage_ccG_DG_1(mesh_, nb_ddl_ccG_, d_, dim_, mat_grad_, passage_ccG_CR):
+    if d_ == 1:
+        EDG_0 = FunctionSpace(mesh_, 'DG', 0)
+        EDG_1 = FunctionSpace(mesh_, 'DG', 1)
+        tens_DG_0 = VectorFunctionSpace(mesh_, 'DG', 0)
+    else:
+        EDG_0 = VectorFunctionSpace(mesh_, 'DG', 0)
+        EDG_1 = VectorFunctionSpace(mesh_, 'DG', 1)
+        tens_DG_0 = TensorFunctionSpace(mesh_, 'DG', 0)
     dofmap_DG_0 = EDG_0.dofmap()
     dofmap_DG_1 = EDG_1.dofmap()
     dofmap_tens_DG_0 = tens_DG_0.dofmap()
     elt_0 = EDG_0.element()
     elt_1 = EDG_1.element()
-    nb_total_dof_DG_1 = dofmap_DG_1.global_dimension()
-    nb_dof_grad = dofmap_tens_DG_0.global_dimension()
-    matrice_resultat_1 = sp.dok_matrix((nb_total_dof_DG_1,nb_dof_ccG_)) #Empty matrix
-    matrice_resultat_2 = sp.dok_matrix((nb_total_dof_DG_1,nb_dof_grad)) #Empty matrix
+    nb_total_dof_DG_1 = len(dofmap_DG_1.dofs())
+    nb_ddl_grad = len(dofmap_tens_DG_0.dofs())
+    matrice_resultat_1 = sp.dok_matrix((nb_total_dof_DG_1,nb_ddl_ccG_)) #Matrice vide.
+    matrice_resultat_2 = sp.dok_matrix((nb_total_dof_DG_1,nb_ddl_grad)) #Matrice vide.
     
-    for c in cells(problem.mesh):
+    for c in cells(mesh_):
         index_cell = c.index()
         dof_position = dofmap_DG_1.cell_dofs(index_cell)
 
         #filling-in the matrix to have the constant cell value
         DG_0_dofs = dofmap_DG_0.cell_dofs(index_cell)
         for dof in dof_position:
-            matrice_resultat_1[dof, DG_0_dofs[dof % problem.d]] = 1.
+            matrice_resultat_1[dof, DG_0_dofs[dof % d_]] = 1.
 
         #filling-in part to add the gradient term
         position_barycentre = elt_0.tabulate_dof_coordinates(c)[0]
@@ -57,10 +44,12 @@ def DEM_to_DG_1_matrix(problem, nb_dof_ccG_, DEM_to_CR):
         tens_dof_position = dofmap_tens_DG_0.cell_dofs(index_cell)
         for dof,pos in zip(dof_position,pos_dof_DG_1): #loop on quadrature points
             diff = pos - position_barycentre
-            for i in range(problem.dim):
-                matrice_resultat_2[dof, tens_dof_position[(dof % problem.d)*problem.d + i]] = diff[i]
-        
-    return matrice_resultat_1.tocsr() +  matrice_resultat_2.tocsr() * problem.mat_grad * DEM_to_CR
+            for i in range(dim_):
+                matrice_resultat_2[dof, tens_dof_position[(dof % d_)*d_ + i]] = diff[i]
+
+    matrice_resultat_1 = matrice_resultat_1.tocsr()
+    matrice_resultat_2 = matrice_resultat_2.tocsr()
+    return (matrice_resultat_1 +  matrice_resultat_2 * mat_grad_ * passage_ccG_CR), matrice_resultat_1, matrice_resultat_2
 
 def gradient_matrix(problem):
     """Creates a matrix computing the cell-wise gradient from the facet values stored in a Crouzeix-raviart FE vector."""
@@ -74,83 +63,13 @@ def gradient_matrix(problem):
     row,col,val = as_backend_type(A).mat().getValuesCSR()
     return sp.csr_matrix((val, col, row))
 
-def facet_interpolation(facet_num,pos_bary_cells,pos_vert,pos_bary_facets,dim_,d_, I=10):
-    """Computes the reconstruction in the facets of the meh from the dofs of the DEM."""
-    
-    toutes_pos_ddl = [] #ordre : d'abord tous les ddl de cellules puis tous ceux des vertex au bord
-    for i in pos_bary_cells.values():
-        if dim_ == 2:
-            toutes_pos_ddl.append(i)
-        elif dim_ == 3:
-            toutes_pos_ddl.append(i)
-    for i in pos_vert.values():
-        toutes_pos_ddl.append(i)
-    toutes_pos_ddl = array(toutes_pos_ddl)
-    #calcul des voisinages par arbre
-    tree = KDTree(toutes_pos_ddl)
-    #num de tous les ddl
-    tous_num_ddl = arange(len(toutes_pos_ddl) * d_)
 
-    #Fixing limits to the number of dofs used in the search for an interpolating simplex
-    if dim_ == 3 and I < 25:
-        I = 25 #comes from experience as default but can be changed
-    if dim_ == 2 and I < 10:
-        I = 10 #idem
-    
-    #calcul du convexe associé à chaque face
-    res_num = dict([])
-    res_pos = dict([])
-    res_coord = dict([])
-    for f,neigh in facet_num.items():
-        if len(neigh) > 1: #Inner facet
-            aux_num = []
-            aux_pos = []
-            x = pos_bary_facets.get(f) #position du barycentre de la face
-            distance,pos_voisins = tree.query(x, I)
-            
-            #adding points to compute the convex hull
-            data_convex_hull = [x]
-            for k in range(I):
-                data_convex_hull.append(tree.data[pos_voisins[k]])
-
-            #computing the convex with the points in the list
-            convex = ConvexHull(data_convex_hull,qhull_options='Qc QJ Pp')
-            if 0 not in convex.vertices: #convex strictly contains the facet barycentre
-                #Faire une triangulation de Delaunay des points du tree
-                list_points = convex.points
-                delau = Delaunay(list_points[1:]) #on retire le barycentre de la face de ces données. On ne le veut pas dans le Delaunay
-                #Ensuite, utiliser le transform sur le Delaunay pour avoir les coords bary du bay de la face. Il reste seulement à trouver dans quel tétra est-ce que toutes les coords sont toutes positives !
-                trans = delau.transform
-                num_simplex = delau.find_simplex(x)
-                coord_bary = delau.transform[num_simplex,:dim_].dot(x - delau.transform[num_simplex,dim_])
-                coord_bary = append(coord_bary, 1. - coord_bary.sum())
-
-                res_coord[f] = coord_bary
-                for k in delau.simplices[num_simplex]:
-                    num = pos_voisins[k] #not k-1 because the barycentre of the face x has been removed from the Delaunay triangulation
-                    if d_ == 1:
-                        aux_num.append([num]) #numéro dans vecteur ccG
-                    elif d_ == 2:
-                        aux_num.append([num * d_, num * d_ + 1])
-                    elif d_ == 3:
-                        aux_num.append([num * d_, num * d_ + 1, num * d_ + 2])
-
-                #On associe le tetra à la face 
-                res_num[f] = aux_num
-                res_pos[f] = aux_pos
-            
-            else:
-                raise ConvexError('Not possible to find a convex containing the barycenter of the facet.\n')
-                                
-    return res_num,res_coord
-
-def DEM_to_CR_matrix(problem, nb_dof_ccG, facet_num, vertex_associe_face, num_ddl_vertex, pos_ddl_vertex):
+def DEM_to_CR_matrix(problem):
     dofmap_CR = problem.CR.dofmap()
     nb_total_dof_CR = dofmap_CR.global_dimension()
 
-    #computing the useful mesh quantities
-    pos_bary_cells = position_cell_dofs(problem.mesh,problem.d)
-    dico_pos_bary_faces = dico_position_bary_face(problem.mesh,problem.d)
+    #computing the facet reconstructions
+    
     
     #Computing the facet reconstructions
     convex_num,convex_coord = facet_interpolation(facet_num,pos_bary_cells,pos_ddl_vertex,dico_pos_bary_faces,problem.dim,problem.d)
@@ -195,14 +114,3 @@ def DEM_to_CR_matrix(problem, nb_dof_ccG, facet_num, vertex_associe_face, num_dd
                     matrice_resultat[num_global_ddl[2], v3[2]] = 1./3.
         
     return matrice_resultat.tocsr()
-
-def compute_all_reconstruction_matrices(problem):
-    """Computes all the required reconstruction matrices."""
-
-    #calling functions to construct the matrices
-    DEM_to_DG = DEM_to_DG_matrix(problem, problem.nb_dof_DEM)
-    DEM_to_CG = DEM_to_CG_matrix(problem, problem.num_ddl_vertex, problem.nb_dof_DEM)
-    DEM_to_CR = DEM_to_CR_matrix(problem, problem.nb_dof_DEM, problem.facet_num, problem.vertex_associe_face, problem.num_ddl_vertex, problem.pos_ddl_vertex)
-    DEM_to_DG_1 = DEM_to_DG_1_matrix(problem, problem.nb_dof_DEM, DEM_to_CR)
-
-    return DEM_to_DG, DEM_to_CG, DEM_to_CR, DEM_to_DG_1

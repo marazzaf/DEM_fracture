@@ -81,37 +81,12 @@ def sigma(eps_el):
     return mu * eps_el
 
 #Variational problem
-#a1 = inner(sigma(eps(Du_DG)), Dv_DG) * dx #does not change with topological changes
-#A1 = assemble(a1)
-#row,col,val = as_backend_type(A1).mat().getValuesCSR()
-#A1 = sp.csr_matrix((val, col, row))
 ref_elastic = ref_elastic_bilinear_form(problem, sigma, eps)
+mat_elas = problem.elastic_bilinear_form(ref_elastic)
+mat_pen = problem.mat_pen
 
-A = problem.elastic_bilinear_form(ref_elastic)
-
-sys.exit()
-
-#Stress output
-a47 = inner(sigma(eps(Du_DG)), Dv_DG) / vol * dx
-A47 = assemble(a47)
-row,col,val = as_backend_type(A47).mat().getValuesCSR()
-mat_stress = sp.csr_matrix((val, col, row))
-
-#average facet stresses
-a50 = dot( dot( avg(sigma(eps(Du_DG))), n('-')), v_CR('-')) / hF('-') * dS #n('-')
-A50 = assemble(a50)
-row,col,val = as_backend_type(A50).mat().getValuesCSR()
-average_stresses = sp.csr_matrix((val, col, row))
-
-#jump in facets
-a48 = dot(jump(u_DG),v_CR('+')) / hF('+') * dS
-A48 = assemble(a48)
-row,col,val = as_backend_type(A48).mat().getValuesCSR()
-disp_jumps = sp.csr_matrix((val, col, row))
-
-#facet areas
-f_CR = TestFunction(U_CR)
-areas = assemble(f_CR('+') * (dS + ds)).get_local() #bien écrit !
+#Stresses output
+problem.mat_stress = output_stress(problem, sigma, eps)
 
 #useful
 solution_u_DG = Function(problem.DG_0,  name="disp DG")
@@ -123,7 +98,7 @@ x = SpatialCoordinate(mesh)
 u_D = Expression('x[1]/fabs(x[1]) * k * t * H * (1 - x[0]/L)', L=Ll, H=H, k=k, t=0, degree=2)
 
 #Homogeneous Neumann BC
-L = np.zeros(nb_ddl_CR)
+L = np.zeros(problem.nb_dof_CR)
 
 file = File('%s/anti_plane_%i_.pvd' % (folder,size_ref))
 
@@ -134,20 +109,19 @@ length_cracked_facets = 0.
 cells_with_cracked_facet = set()
 not_breakable_facets = set()
 
-#initial conditions
-u = np.zeros(nb_ddl_ccG)
-
 cracking_facets = set()
 cells_to_test = set()
 #before the computation begins, we break the facets to have a crack of length 1
-for (x,y) in G.edges():
-    f = G[x][y]['dof_CR'][0] // d
-    pos = G[x][y]['barycentre']
-    if G[x][y]['breakable'] and abs(pos[1]) < 1.e-15 and pos[0] < l0:
+for (x,y) in problem.Graph.edges():
+    f = problem.Graph[x][y]['dof_CR'][0] // d
+    pos = problem.Graph[x][y]['barycentre']
+    if problem.Graph[x][y]['breakable'] and abs(pos[1]) < 1.e-15 and pos[0] < l0:
         cracking_facets.add(f)
-        cracked_facet_vertices.append(G[x][y]['vertices']) #position of vertices of the broken facet
+        cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
         cells_with_cracked_facet |= {x,y}
         #cells_to_test |= set(facet_num.get(f)) #verifying only one facet per cell breaks
+
+sys.exit()
 
 #adapting after crack
 passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)

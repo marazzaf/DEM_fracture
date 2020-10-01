@@ -20,20 +20,18 @@ def local_project(v, V, u=None):
         solver.solve_local_rhs(u)
         return
 
-def mass_matrix(mesh_, d_, dim_, rho_, nb_ddl_ccG_):
-    if d_ == dim_: #vectorial problem
-        U_DG = VectorFunctionSpace(mesh_, "DG", 0)
-        one = Constant(np.ones(dim_)) #to get the diagonal
-    elif d_ == 1: #scalar problem
-        U_DG = FunctionSpace(mesh_, "DG", 0)
+def mass_matrix(rho_):
+    if problem.d_ == problem.dim: #vectorial problem
+        one = Constant(np.ones(problem.dim)) #to get the diagonal
+    elif problem.d == 1: #scalar problem
         one = Constant(1.) #to get the diagonal
 
     #original mass matrix
-    u_DG = TrialFunction(U_DG)
-    v_DG = TestFunction(U_DG)
+    u_DG = TrialFunction(problem.DG)
+    v_DG = TestFunction(problem.DG)
     M = rho_ * inner(u_DG,v_DG) * dx
     res = assemble(action(M, one)).get_local()
-    res.resize(nb_ddl_ccG_)
+    res.resize(problem.nb_dof_DEM)
 
     return res
 
@@ -64,7 +62,6 @@ def assemble_volume_load(load, problem):
     L = assemble(form)
     return problem.DEM_to_DG.T * L
 
-
 def schur_matrices(problem):
     aux = list(np.arange(problem.nb_dof_cells))
     aux_bis = list(np.arange(problem.nb_dof_cells, problem.nb_dof_DEM))
@@ -79,3 +76,15 @@ def schur_matrices(problem):
     for (i,j) in zip(range(mat_D.shape[0]),aux_bis):
         mat_D[i,j] = 1.
     return mat_not_D.tocsr(), mat_D.tocsr()
+
+def output_stress(problem, sigma=grad, eps=grad):
+    vol = CellVolume(problem.mesh)
+    Du_DG = TrialFunction(problem.W)
+    Dv_DG = TestFunction(problem.W)
+    
+    a47 = inner(sigma(eps(Du_DG)), Dv_DG) / vol * dx
+    A47 = assemble(a47)
+    row,col,val = as_backend_type(A47).mat().getValuesCSR()
+    mat_stress = csr_matrix((val, col, row))
+    
+    return mat_stress

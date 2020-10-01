@@ -50,63 +50,69 @@ class DEMProblem:
         self.DEM_to_CR,self.trace_matrix = DEM_to_CR_matrix(self)
         print('Reconstruction matrices ok!')
 
+        #Penalty matrix
+        self.mat_pen,self.mat_jump_1,self.mat_jump_2 = penalty_term(self, nz_vec_BC)
+        self.mat_elas = self.elastic_bilinear_form(ref_elastic)
+
     def elastic_bilinear_form(self,ref_elastic):
         return  self.DEM_to_CR.T * self.mat_grad.T * ref_elastic * self.mat_grad * self.DEM_to_CR
+
+    def adapting_elasticity_and_penalty(self,ref_elastic,cracking_facets):
+        #Removing penalty terms
+        mat_jump_1_aux,mat_jump_2_aux = removing_penalty(self, cracking_facets)
+        self.mat_jump_1 -= mat_jump_1_aux
+        self.mat_jump_2 -= mat_jump_2_aux
+        passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)
+
+        #Assembling new elastic term
+        self.mat_elas = self.elastic_bilinear_form(ref_elastic)
+
+        #Assembling new penalty term
+        self.mat_jump_1.resize((self.nb_dof_CR,self.nb_dof_DEM))
+        self.mat_jump_2.resize((self.nb_dof_CR,self.nb_dof_grad))
+        mat_jump = self.mat_jump_1 + self.mat_jump_2 * self.mat_grad * self.DEM_to_CR
+        self.mat_pen = mat_jump.T * mat_jump
+        
+        return
 
 def ref_elastic_bilinear_form(problem, sigma=grad, eps=grad):
     Du = TrialFunction(problem.W)
     Dv = TestFunction(problem.W)
 
-    #Mettre eps et sigma en arguments de la fonction ?
-    #if problem.d == 1:
-    #    a1 = eps(Du) * sigma(eps(Dv)) * dx
-    #elif problem.d == problem.dim:
-    a1 = inner(eps(Du), sigma(eps(Dv))) * dx
-    #else:
-    #    raise ValueError('Problem is either scalar or vectorial (in 2d and 3d)')
-    
+    a1 = inner(eps(Du), sigma(eps(Dv))) * dx    
     A1 = assemble(a1)
     row,col,val = as_backend_type(A1).mat().getValuesCSR()
     A1 = csr_matrix((val, col, row))
     return A1
 
-def penalty_term(nb_ddl_ccG_, mesh_, d_, dim_, mat_grad_, passage_ccG_CR_, G_, nb_ddl_CR_, nz_vec_BC):
-    if d_ >= 2:
-        U_DG = VectorFunctionSpace(mesh_, 'DG', 0)
-        tens_DG_0 = TensorFunctionSpace(mesh_, 'DG', 0)
-    else:
-        U_DG = FunctionSpace(mesh_, 'DG', 0)
-        tens_DG_0 = VectorFunctionSpace(mesh_, 'DG', 0)
-        
-    nb_ddl_cells = U_DG.dofmap().global_dimension()
-    dofmap_tens_DG_0 = tens_DG_0.dofmap()
-    nb_ddl_grad = dofmap_tens_DG_0.global_dimension()
+def penalty_term(problem, nz_vec_BC):
+    dofmap_tens_DG_0 = problem.W.dofmap()
 
     #creating jump matrix
-    mat_jump_1 = sp.dok_matrix((nb_ddl_CR_,nb_ddl_ccG_))
-    mat_jump_2 = sp.dok_matrix((nb_ddl_CR_,nb_ddl_grad))
-    for (x,y) in G_.edges():
-        num_global_ddl = G_[x][y]['dof_CR']
-        coeff_pen = G_[x][y]['pen_factor']
-        pos_bary_facet = G_[x][y]['barycentre'] #position barycentre of facet
-        if abs(x) < nb_ddl_cells // d_ and abs(y) < nb_ddl_cells // d_: #Inner facet
+    mat_jump_1 = sp.dok_matrix((problem.nb_dof_CR,problem.nb_dof_DEM))
+    mat_jump_2 = sp.dok_matrix((problem.nb_dof_CR,problem.nb_dof_grad))
+    for (x,y) in problem.Graph.edges():
+        num_global_ddl = problem.Graph[x][y]['dof_CR']
+        coeff_pen = problem.Graph[x][y]['pen_factor']
+        pos_bary_facet = problem.Graph[x][y]['barycentre'] #position barycentre of facet
+        if abs(x) < problem.nb_dof_cells // problem.d and abs(y) < problem.nb_dof_cells // problem.d: #Inner facet
             c1,c2 = x,y
             #filling-in the DG 0 part of the jump
-            mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,d_ * c1 : (c1+1) * d_] = np.sqrt(coeff_pen)*np.eye(d_)
-            mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,d_ * c2 : (c2+1) * d_] = -np.sqrt(coeff_pen)*np.eye(d_)
+            mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,problem.d * c1 : (c1+1) * problem.d] = np.sqrt(coeff_pen)*np.eye(problem.d)
+            mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,problem.d * c2 : (c2+1) * problem.d] = -np.sqrt(coeff_pen)*np.eye(problem.d)
 
             for num_cell,sign in zip([c1,c2],[1., -1.]):
                 #filling-in the DG 1 part of the jump...
-                pos_bary_cell = G_.node[num_cell]['pos']
+                pos_bary_cell = problem.Graph.node[num_cell]['pos']
                 diff = pos_bary_facet - pos_bary_cell
                 pen_diff = np.sqrt(coeff_pen)*diff
                 tens_dof_position = dofmap_tens_DG_0.cell_dofs(num_cell)
                 for num,dof_CR in enumerate(num_global_ddl):
-                    for i in range(dim_):
-                        mat_jump_2[dof_CR,tens_dof_position[num*d_ + i]] = sign*pen_diff[i]
+                    for i in range(problem.dim):
+                        mat_jump_2[dof_CR,tens_dof_position[num*problem.d + i]] = sign*pen_diff[i]
 
         #Penalty between facet reconstruction and cell value
-        elif (abs(x) >= nb_ddl_cells // d_ or abs(y) >= nb_ddl_cells // d_) and len(set(num_global_ddl) & nz_vec_BC) > 0: #Outer facet
+        elif (abs(x) >= problem.nb_dof_cells // problem.d or abs(y) >= problem.nb_dof_cells // problem.d) and len(set(num_global_ddl) & nz_vec_BC) > 0: #Outer facet
         
             if x >= 0 and y >= 0:
                 num_cell = min(x,y)
@@ -119,26 +125,22 @@ def penalty_term(nb_ddl_ccG_, mesh_, d_, dim_, mat_grad_, passage_ccG_CR_, G_, n
             coeff_pen = np.sqrt(coeff_pen)
             
             #cell part
-            #filling-in the DG 0 part of the jump
-            #dof = G_.node[num_cell]['dof']
             for pos,num_CR in enumerate(num_global_ddl): #should not be all num_global_dll but just what is in nz_vec_BC
-            #for dof_CR,dof_c in zip(num_global_ddl,dof):
                 if num_CR in nz_vec_BC:
-                    mat_jump_1[num_CR,d_ * num_cell + pos] = coeff_pen
-                    #mat_jump_1[dof_CR,dof_c] = coeff_pen
+                    mat_jump_1[num_CR,problem.d * num_cell + pos] = coeff_pen
         
             #filling-in the DG 1 part of the jump
-            pos_bary_cell = G_.node[num_cell]['pos']
+            pos_bary_cell = problem.Graph.node[num_cell]['pos']
             diff = pos_bary_facet - pos_bary_cell
             pen_diff = coeff_pen*diff
             tens_dof_position = dofmap_tens_DG_0.cell_dofs(num_cell)
             for num,dof_CR in enumerate(num_global_ddl):
                 if dof_CR in nz_vec_BC:
-                    for i in range(dim_):
-                        mat_jump_2[dof_CR,tens_dof_position[num*d_ + i]] = pen_diff[i]
+                    for i in range(problem.dim):
+                        mat_jump_2[dof_CR,tens_dof_position[num*problem.d + i]] = pen_diff[i]
 
             #boundary facet part
-            dof = G_.node[other]['dof']
+            dof = problem.Graph.node[other]['dof']
             count = 0
             for num_CR in num_global_ddl:
                 if num_CR in nz_vec_BC:
@@ -148,43 +150,34 @@ def penalty_term(nb_ddl_ccG_, mesh_, d_, dim_, mat_grad_, passage_ccG_CR_, G_, n
 
     mat_jump_1 = mat_jump_1.tocsr()
     mat_jump_2 = mat_jump_2.tocsr()
-    mat_jump = mat_jump_1 + mat_jump_2 * mat_grad_ * passage_ccG_CR_
-    return mat_jump.T * mat_jump, mat_jump_1, mat_jump_2#, bnd_1, bnd_2
+    mat_jump = mat_jump_1 + mat_jump_2 * problem.mat_grad * problem.DEM_to_CR
+    return mat_jump.T * mat_jump, mat_jump_1, mat_jump_2
 
-def removing_penalty(mesh_, d_, dim_, nb_ddl_ccG_, mat_grad_, passage_ccG_CR_, G_, nb_ddl_CR_, cracking_facets, facet_num):
-    if d_ >= 2:
-        U_DG = VectorFunctionSpace(mesh_, 'DG', 0)
-        tens_DG_0 = TensorFunctionSpace(mesh_, 'DG', 0)
-    else:
-        U_DG = FunctionSpace(mesh_, 'DG', 0)
-        tens_DG_0 = VectorFunctionSpace(mesh_, 'DG', 0)
-        
-    nb_ddl_cells = U_DG.dofmap().global_dimension()
-    dofmap_tens_DG_0 = tens_DG_0.dofmap()
-    nb_ddl_grad = dofmap_tens_DG_0.global_dimension()
+def removing_penalty(problem, cracking_facets):    
+    dofmap_tens_DG_0 = problem.W.dofmap()
 
     #creating jump matrix
-    mat_jump_1 = sp.dok_matrix((nb_ddl_CR_,nb_ddl_ccG_))
-    mat_jump_2 = sp.dok_matrix((nb_ddl_CR_,nb_ddl_grad))
+    mat_jump_1 = sp.dok_matrix((problem.nb_dof_CR,problem.nb_dof_DEM))
+    mat_jump_2 = sp.dok_matrix((problem.nb_dof_CR,problem.nb_dof_grad))
 
     for f in cracking_facets: #utiliser facet_num pour avoir les voisins ?
-        assert(len(facet_num.get(f)) == 2)
-        c1,c2 = facet_num.get(f) #must be two otherwise external facet broke
-        num_global_ddl = G_[c1][c2]['dof_CR']
-        coeff_pen = G_[c1][c2]['pen_factor']
-        pos_bary_facet = G_[c1][c2]['barycentre'] #position barycentre of facet
+        assert len(self.facet_num.get(f)) == 2
+        c1,c2 = self.facet_num.get(f) #must be two otherwise external facet broke
+        num_global_ddl = problem.Graph[c1][c2]['dof_CR']
+        coeff_pen = problem.Graph[c1][c2]['pen_factor']
+        pos_bary_facet = problem.Graph[c1][c2]['barycentre'] #position barycentre of facet
         #filling-in the DG 0 part of the jump
         mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,d_ * c1 : (c1+1) * d_] = np.sqrt(coeff_pen)*np.eye(d_)
         mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,d_ * c2 : (c2+1) * d_] = -np.sqrt(coeff_pen)*np.eye(d_)
 
         for num_cell,sign in zip([c1,c2],[1., -1.]):
             #filling-in the DG 1 part of the jump...
-            pos_bary_cell = G_.node[num_cell]['pos']
+            pos_bary_cell = problem.Graph.node[num_cell]['pos']
             diff = pos_bary_facet - pos_bary_cell
             pen_diff = np.sqrt(coeff_pen)*diff
             tens_dof_position = dofmap_tens_DG_0.cell_dofs(num_cell)
             for num,dof_CR in enumerate(num_global_ddl):
-                for i in range(dim_):
+                for i in range(problem.dim):
                     mat_jump_2[dof_CR,tens_dof_position[(num % d_)*d_ + i]] = sign*pen_diff[i]
 
     return mat_jump_1.tocsr(), mat_jump_2.tocsr()

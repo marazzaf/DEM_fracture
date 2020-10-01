@@ -3,10 +3,9 @@
 from dolfin import *
 from scipy.sparse import csr_matrix,dok_matrix
 import numpy as np
-from package.errors import *
-from package.reconstructions import compute_all_reconstruction_matrices,gradient_matrix
-from package.mesh_related import *
-from package.miscellaneous import Dirichlet_BC,schur_matrices
+from DEM_cracking.reconstructions import compute_all_reconstruction_matrices,gradient_matrix
+from DEM_cracking.mesh_related import *
+from DEM_cracking.miscellaneous import Dirichlet_BC,schur_matrices
 
 class DEMProblem:
     """ Class that will contain the basics of a DEM problem from the mesh and the dimension of the problem to reconstrucion matrices and gradient matrix."""

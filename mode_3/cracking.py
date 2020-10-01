@@ -1,11 +1,10 @@
 # coding: utf-8
 import sys
-sys.path.append('../')
 from dolfin import *
-#from DEM_cracking import *
-from DEM_cracking.DEM import DEMProblem
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import cg
+from DEM_cracking.DEM import *
+from DEM_cracking.miscellaneous import *
 
 # Form compiler options
 parameters["form_compiler"]["cpp_optimize"] = True
@@ -72,22 +71,25 @@ nz_vec_BC = set(nz_vec_BC)
 #Creating the DEM problem
 problem = DEMProblem(mesh, d, penalty, nz_vec_BC)
 
-sys.exit()
+#Imposing strongly Dirichlet BC
+mat_not_D,mat_D = schur_matrices(problem)
 
-#Cell-centre Galerkin reconstruction
-coord_bary,coord_num = smallest_convexe_bary_coord(mesh,facet_num,d,G)
-print('Convexe ok !')
-passage_ccG_to_CR,trace_matrix = matrice_passage_ccG_CR(mesh, coord_num, coord_bary, d, G, nb_ddl_ccG)
-mat_not_D,mat_D = schur(nb_ddl_cells, nb_ddl_ccG)
+def eps(v): #v is a gradient matrix
+    return v
+
+def sigma(eps_el):
+    return mu * eps_el
 
 #Variational problem
-a1 = inner(sigma(eps(Du_DG)), Dv_DG) * dx #does not change with topological changes
-A1 = assemble(a1)
-row,col,val = as_backend_type(A1).mat().getValuesCSR()
-A1 = sp.csr_matrix((val, col, row))
+#a1 = inner(sigma(eps(Du_DG)), Dv_DG) * dx #does not change with topological changes
+#A1 = assemble(a1)
+#row,col,val = as_backend_type(A1).mat().getValuesCSR()
+#A1 = sp.csr_matrix((val, col, row))
+ref_elastic = ref_elastic_bilinear_form(problem, sigma, eps)
 
-def elastic_term(mat_grad_, passage):
-    return  passage.T * mat_grad_.T * A1 * mat_grad_ * passage
+A = problem.elastic_bilinear_form(ref_elastic)
+
+sys.exit()
 
 #Stress output
 a47 = inner(sigma(eps(Du_DG)), Dv_DG) / vol * dx
@@ -119,13 +121,6 @@ solution_stress = Function(problem.W, name="Stress")
 x = SpatialCoordinate(mesh)
 #Dirichlet BC
 u_D = Expression('x[1]/fabs(x[1]) * k * t * H * (1 - x[0]/L)', L=Ll, H=H, k=k, t=0, degree=2)
-
-#Load and non-homogeneous Dirichlet BC
-def eps(v): #v is a gradient matrix
-    return v
-
-def sigma(eps_el):
-    return mu * eps_el
 
 #Homogeneous Neumann BC
 L = np.zeros(nb_ddl_CR)

@@ -48,50 +48,27 @@ class DEMProblem:
         #DEM reconstructions
         self.DEM_to_DG = DEM_to_DG_matrix(self)
         self.DEM_to_CR,self.trace_matrix = DEM_to_CR_matrix(self)
-#        passage_ccG_to_DG_1,ccG_to_DG_1_aux_1,ccG_to_DG_1_aux_2 = matrice_passage_ccG_DG_1(mesh, nb_ddl_ccG, d, dim, mat_grad, passage_ccG_to_CR)
-#        print('Reconstruction matrices ok!')
-#
-#        #Dirichlet conditions
-#
-#    def for_dirichlet(self, A, boundary_dirichlet=None):
-#        hF = FacetArea(self.mesh)
-#        v_CG = TestFunction(self.CG)
-#        if boundary_dirichlet == None: #dependence on self.d ???
-#            form_dirichlet = inner(v_CG('+'),as_vector((1.,1.))) / hF * ds
-#        else:
-#            form_dirichlet = inner(v_CG('+'),as_vector((1.,1.))) / hF * ds(boundary_dirichlet)
-#        A_BC = Dirichlet_BC(form_dirichlet, self.DEM_to_CG)
-#        self.mat_not_D,self.mat_D = schur_matrices(A_BC)
-#        #A_D = mat_D * A * mat_D.T
-#        A_not_D = self.mat_not_D * A * self.mat_not_D.T
-#        B = self.mat_not_D * A * self.mat_D.T
-#        return A_not_D,B
+        print('Reconstruction matrices ok!')
 
+    def elastic_bilinear_form(self,ref_elastic):
+        return  self.DEM_to_CR.T * self.mat_grad.T * ref_elastic * self.mat_grad * self.DEM_to_CR
 
-def elastic_bilinear_form(mesh_, d_, DEM_to_CR_matrix, sigma=grad, eps=grad):
-    dim = mesh_.geometric_dimension()
-    if d_ == 1:
-        U_CR = FunctionSpace(mesh_, 'CR', 1)
-    elif d_ == dim:
-        U_CR = VectorFunctionSpace(mesh_, 'CR', 1)
-    else:
-        raise ValueError('Problem is either scalar or vectorial (in 2d and 3d)')
-
-    u_CR = TrialFunction(U_CR)
-    v_CR = TestFunction(U_CR)
+def ref_elastic_bilinear_form(problem, sigma=grad, eps=grad):
+    Du = TrialFunction(problem.W)
+    Dv = TestFunction(problem.W)
 
     #Mettre eps et sigma en arguments de la fonction ?
-    if d_ == 1:
-        a1 = eps(u_CR) * sigma(v_CR) * dx
-    elif d_ == dim:
-        a1 = inner(eps(u_CR), sigma(v_CR)) * dx
-    else:
-        raise ValueError('Problem is either scalar or vectorial (in 2d and 3d)')
+    #if problem.d == 1:
+    #    a1 = eps(Du) * sigma(eps(Dv)) * dx
+    #elif problem.d == problem.dim:
+    a1 = inner(eps(Du), sigma(eps(Dv))) * dx
+    #else:
+    #    raise ValueError('Problem is either scalar or vectorial (in 2d and 3d)')
     
     A1 = assemble(a1)
     row,col,val = as_backend_type(A1).mat().getValuesCSR()
     A1 = csr_matrix((val, col, row))
-    return DEM_to_CR_matrix.T * A1 * DEM_to_CR_matrix
+    return A1
 
 def penalty_term(nb_ddl_ccG_, mesh_, d_, dim_, mat_grad_, passage_ccG_CR_, G_, nb_ddl_CR_, nz_vec_BC):
     if d_ >= 2:

@@ -65,17 +65,17 @@ def assemble_volume_load(load, problem):
     return problem.DEM_to_DG.T * L
 
 
-def schur_matrices(nb_ddl_cells_, nb_ddl_ccG_):
-    aux = list(np.arange(nb_ddl_cells_))
-    aux_bis = list(np.arange(nb_ddl_cells_, nb_ddl_ccG_))
+def schur_matrices(problem):
+    aux = list(np.arange(problem.nb_dof_cells))
+    aux_bis = list(np.arange(problem.nb_dof_cells, problem.nb_dof_DEM))
 
     #Get non Dirichlet values
-    mat_not_D = sp.dok_matrix((nb_ddl_cells_, nb_ddl_ccG_))
+    mat_not_D = dok_matrix((problem.nb_dof_cells, problem.nb_dof_DEM))
     for (i,j) in zip(range(mat_not_D.shape[0]),aux):
         mat_not_D[i,j] = 1.
 
     #Get Dirichlet boundary conditions
-    mat_D = sp.dok_matrix((nb_ddl_ccG_ - nb_ddl_cells_, nb_ddl_ccG_))
+    mat_D = dok_matrix((problem.nb_dof_DEM - problem.nb_dof_cells, problem.nb_dof_DEM))
     for (i,j) in zip(range(mat_D.shape[0]),aux_bis):
         mat_D[i,j] = 1.
     return mat_not_D.tocsr(), mat_D.tocsr()

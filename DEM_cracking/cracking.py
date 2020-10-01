@@ -1,67 +1,45 @@
 #coding: utf-8
 
-#Will contain all functions linked to cracking facets and adpating problem after cracking
+def adapting_graph(problem, cracking_facets):
+    #Modifying connectivity graph
+    for f in cracking_facets:
+        n1,n2 = problem.facet_num.get(f) #n1 : plus, n2 : minus    
+        #retrieving facets impacted by rutpure:
+        impacted_facets.update(problem.Graph[n1][n2]['recon']) #impacted facets will have a new CR reconstruction
+        ex_dofs = problem.Graph[n1][n2]['dof_CR']
+        ex_num = problem.Graph[n1][n2]['num']
+        ex_bary = problem.Graph[n1][n2]['barycentre']
+        ex_normal = problem.Graph[n1][n2]['normal']
+        ex_measure = problem.Graph[n1][n2]['measure']
+        ex_vertices = problem.Graph[n1][n2]['vertices']
+        ex_pen = problem.Graph[n1][n2]['pen_factor']
+        
+        #removing link between the two cell dofs
+        problem.Graph.remove_edge(n1,n2)
+        
+        #adding the new facet dofs
+        problem.Graph.add_node(problem.nb_dof_cells // problem.d + f, pos=ex_bary, sign=int(1), vertices=np.array([])) #linked with n1
+        problem.Graph.add_node(-problem.nb_dof_cells // problem.d - f, pos=ex_bary, sign=int(-1), vertices=np.array([])) #linked with n2
+
+        #adding the connectivity between cell dofs and new facet dofs
+        problem.Graph.add_edge(n1, problem.nb_ddl_cells // problem.d + f, num=ex_num, dof_CR=ex_dofs, measure=ex_measure, barycentre=ex_bary, breakable=False, vertices=ex_vertices, pen_factor = ex_pen)
+        problem.face_num[f] = [n1]
+        new_dof_CR = list(np.arange(problem.nb_dof_CR, problem.nb_dof_CR+problem.d))
+        problem.Graph.add_edge(-problem.nb_ddl_cells // problem.d - f, n2, num=nb_ddl_CR_new//d_, dof_CR=new_dof_CR, measure=ex_measure, barycentre=ex_bary, breakable=False, vertices=ex_vertices, pen_factor = ex_pen)
+        problem.nb_dof_CR += problem.d
+        problem.facet_num[-f] = [n2]
+
+    return impacted_facets #will be used to update CR reconstruction
+
+def adapting_facet_reconstruction(problem, cracking_facets, already_cracked_facets, impacted_facets):
+    return
+    
 
 def adapting_after_crack(cracking_facets, already_cracked_facets, d_, dim, face_num, nb_ddl_cells_, nb_ddl_ccG_, nb_ddl_CR, passage_CR, mat_grad, G_, mat_D, mat_not_D):
     nb_ddl_CR_new = nb_ddl_CR
     tetra_coord_bary = dict([])
     tetra_coord_num = dict([])
     impacted_facets = set([])
-
-    #modifying connectivity graph
-    set_impacted_cells = set() #filled-in in case of fragment detaching
-    for f in cracking_facets:
-        #print('num_face: %i' % f)
-        n1,n2 = face_num.get(f) #n1 : plus, n2 : minus
-        set_impacted_cells |= {n1,n2}
-        #retrieving facets impacted by rutpure:
-        impacted_facets.update(G_[n1][n2]['recon']) #impacted facets will have a new CR reconstruction
-        ex_dofs = G_[n1][n2]['dof_CR']
-        ex_num = G_[n1][n2]['num']
-        ex_bary = G_[n1][n2]['barycentre']
-        ex_normal = G_[n1][n2]['normal']
-        ex_measure = G_[n1][n2]['measure']
-        ex_vertices = G_[n1][n2]['vertices']
-        ex_pen = G_[n1][n2]['pen_factor']
-        
-        #removing link between the two cell dofs
-        G_.remove_edge(n1,n2)
-        #adding the new facet dofs
-        #dof_1 = list(np.arange(count_nb_ddl_ccG, count_nb_ddl_ccG+d_))
-        G_.add_node(nb_ddl_cells_ // d_ + f, pos=ex_bary, sign=int(1), vertices=np.array([])) #linked with n1
-        #count_nb_ddl_ccG += d_
-        #dof_2 = list(np.arange(count_nb_ddl_ccG, count_nb_ddl_ccG+d_))
-        G_.add_node(-nb_ddl_cells_ // d_ - f, pos=ex_bary, sign=int(-1), vertices=np.array([])) #linked with n2
-        #count_nb_ddl_ccG += d_
-        #adding the connectivity between cell dofs and new facet dofs
-        G_.add_edge(n1, nb_ddl_cells_ // d_ + f, num=ex_num, dof_CR=ex_dofs, measure=ex_measure, barycentre=ex_bary, normal=ex_normal, breakable=False, vertices=ex_vertices, pen_factor = ex_pen)
-        face_num[f] = [n1]
-        new_dof_CR = list(np.arange(nb_ddl_CR_new, nb_ddl_CR_new+d_))
-        G_.add_edge(-nb_ddl_cells_ // d_ - f, n2, num=nb_ddl_CR_new//d_, dof_CR=new_dof_CR, measure=ex_measure, barycentre=ex_bary, normal=ex_normal, breakable=False, vertices=ex_vertices, pen_factor = ex_pen)
-        nb_ddl_CR_new += d_
-        face_num[-f] = [n2]
-        #end modifications in graph etc...
-
-    #if fragment detaches modify mat_D and mat_not_D
-    for c in set_impacted_cells:
-        fragment = False
-        count = 0
-        for n in nx.neighbors(G_, c):
-            if abs(n) >= nb_ddl_cells_: #boundary
-                count += 1
-        if count == dim+1:
-            fragment = True
-
-        if fragment: #modification of Schur complement
-            #modify mat_D and mat_not_D
-            #mat_D = mat_D.todok() #does not need to be modified
-            mat_not_D = mat_not_D.todok()
-            for i in G_.node[c]['dof']:
-                mat_not_D[i,i] = 0. #Not used to solve system any longer
-            mat_not_D = mat_not_D.tocsr()
-            mat_not_D.eliminate_zeros()
-
-        #How to take care of two cells detaching together ????
         
 
     #Modifying matrix passage_CR
@@ -137,24 +115,28 @@ def adapting_after_crack(cracking_facets, already_cracked_facets, d_, dim, face_
                 passage_CR_new[num_global_ddl[1],i[1]] += j
             if d_ == 3:
                 passage_CR_new[num_global_ddl[2],i[2]] += j
-            
-    #Modifying the gradient reconstruction matrix
-    #No renumbering because uses CR dofs and not ccG dofs !!!
-    mat_grad.resize((mat_grad.shape[0],nb_ddl_CR_new))
-    mat_grad_new = mat_grad.tolil() #only changes for cells having a facet that broke
-    for f in cracking_facets:
-        #first newly facet dof and associated cell
-        c1 = face_num[f][0]
-        mat_grad_new[c1 * d_ * dim : (c1+1) * d_ * dim, :] = local_gradient_matrix(c1, G_, dim, d_, nb_ddl_CR_new)
-        c2 = face_num[-f][0]
-        mat_grad_new[c2 * d_ * dim : (c2+1) * d_ * dim, :] = local_gradient_matrix(c2, G_, dim, d_, nb_ddl_CR_new)
 
     #Optimization
     passage_CR_back = passage_CR_new.tocsr()
     passage_CR_back.eliminate_zeros()
 
+    return mat_D, mat_not_D
 
-    return passage_CR_back.tocsr(), mat_grad_new.tocsr(), nb_ddl_CR_new, face_num, mat_D, mat_not_D
+def adapting_grad_matrix(problem, cracking_facets):
+    #Modifying the gradient reconstruction matrix
+    #No renumbering because uses CR dofs and not ccG dofs !!!
+    problem.mat_grad.resize((problem.mat_grad.shape[0],problem.nb_dof_CR))
+    mat_grad_new = problem.mat_grad.tolil() #only changes for cells having a facet that broke
+    for f in cracking_facets:
+        #first newly facet dof and associated cell
+        c1 = problem.facet_num[f][0]
+        mat_grad_new[c1 * problem.d * problem.dim : (c1+1) * problem.d * problem.dim, :] = local_gradient_matrix(c1, problem)
+        c2 = problem.facet_num[-f][0]
+        mat_grad_new[c2 * problme.d * problem.dim : (c2+1) * problem.d * problem.dim, :] = local_gradient_matrix(c2, problem)
+
+    problem.mat_grad = problem.mat_grad.tocsr()
+    
+    return
 
 def out_cracked_facets(folder,num_computation, num_output, cracked_facets_vertices, dim_): #Sortie au format vtk
     crack = open('%s/crack_%i_%i.vtk' % (folder,num_computation,num_output), 'w')
@@ -199,12 +181,12 @@ def out_cracked_facets(folder,num_computation, num_output, cracked_facets_vertic
     crack.close()
     return
 
-def local_gradient_matrix(num_cell, G_, dim, d_, nb_ddl_CR):
-    res = sp.lil_matrix((d_ * dim, nb_ddl_CR))
-    bary_cell = G_.node[num_cell]['pos']
-    vol = G_.node[num_cell]['measure']
-    for (u,v) in nx.edges(G_, nbunch=num_cell): #getting facets of the cell (in edges)
-        f = G_[u][v] #edge corresponding to the facet
+def local_gradient_matrix(num_cell, problem):
+    res = sp.lil_matrix((problem.d * problem.dim, problem.nb_dof_CR))
+    bary_cell = problem.Graph.node[num_cell]['pos']
+    vol = problem.Graph.node[num_cell]['measure']
+    for (u,v) in nx.edges(problem.Graph, nbunch=num_cell): #getting facets of the cell (in edges)
+        f = problem.Graph[u][v] #edge corresponding to the facet
         normal = f['normal']
         normal = normal * np.sign( np.dot(normal, f['barycentre'] - bary_cell) ) #getting the outer normal to the facet with respect to the cell
         dofs = f['dof_CR'] #getting the right number of the dof corresponding to the facet

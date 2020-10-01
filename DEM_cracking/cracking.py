@@ -32,26 +32,20 @@ def adapting_graph(problem, cracking_facets):
     return impacted_facets #will be used to update CR reconstruction
 
 def adapting_facet_reconstruction(problem, cracking_facets, already_cracked_facets, impacted_facets):
-    return
+    #Modifying matrix passage_CR
+    problem.DEM_to_CR.resize((problem.nb_dof_CR,problem.nb_dof_DEM))
+    passage_CR_new = problem.DEM_to_CR.tolil()
     
 
-def adapting_after_crack(cracking_facets, already_cracked_facets, d_, dim, face_num, nb_ddl_cells_, nb_ddl_ccG_, nb_ddl_CR, passage_CR, mat_grad, G_, mat_D, mat_not_D):
-    nb_ddl_CR_new = nb_ddl_CR
-    tetra_coord_bary = dict([])
-    tetra_coord_num = dict([])
-    impacted_facets = set([])
-        
-
-    #Modifying matrix passage_CR
-    passage_CR.resize((nb_ddl_CR_new,nb_ddl_ccG_))
-    passage_CR_new = passage_CR.tolil() #.todok()
+    tetra_coord_bary = dict()
+    tetra_coord_num = dict()
     #fill rows for new dof
     #Putting ones in new facet dofs and putting 0 where there were barycentric reconstructions
     for f in cracking_facets:
-        n1 = face_num.get(f)[0]
-        n2 = face_num.get(-f)[0]
-        num_global_ddl_1 = G_[n1][f + nb_ddl_cells_ // d_]['dof_CR']
-        num_global_ddl_2 = G_[-f - nb_ddl_cells_ // d_][n2]['dof_CR']
+        n1 = problem.facet_num.get(f)[0]
+        n2 = problem.facet_num.get(-f)[0]
+        num_global_ddl_1 = problem.Graph[n1][f + problem.nb_dof_cells // problem.d]['dof_CR']
+        num_global_ddl_2 = problem.Graph[-f - problem.nb_dof_cells // problem.d][n2]['dof_CR']
             
         #deleting previous barycentric reconstruction
         passage_CR_new[num_global_ddl_1[0], :] = np.zeros(passage_CR_new.shape[1])
@@ -60,8 +54,8 @@ def adapting_after_crack(cracking_facets, already_cracked_facets, d_, dim, face_
         if d_ == 3: #troisième ligne
             passage_CR_new[num_global_ddl_1[2], :] = np.zeros(passage_CR_new.shape[1])
         #recomputing the CR reconstruction
-        coord_bary_1,coord_num_1,connectivity_recon_1 = test_symmetric_bary_coord(f,face_num,dim,d_,G_,nb_ddl_cells_)
-        coord_bary_2,coord_num_2,connectivity_recon_2 = test_symmetric_bary_coord(-f,face_num,dim,d_,G_,nb_ddl_cells_)
+        coord_bary_1,coord_num_1,connectivity_recon_1 = bary_coord(f, problem)
+        coord_bary_2,coord_num_2,connectivity_recon_2 = bary_coord(-f, problem)
 
         #Filling-in the new reconstruction
         for i1,j1,i2,j2 in zip(coord_num_1,coord_bary_1,coord_num_2,coord_bary_2):
@@ -77,31 +71,31 @@ def adapting_after_crack(cracking_facets, already_cracked_facets, d_, dim, face_
     impacted_facets.difference_update(already_cracked_facets) #removing already cracked facets from the set of facets that need a new CR reconstruction
 
     #The connectivity recon will be recomputed. Thus retrieving the num of the facet from the potentially impacted. Will be upadted afterwards.
-    for (u,v,r) in G_.edges(data='recon'):
+    for (u,v,r) in problem.Graph.edges(data='recon'):
         if r != None:
             r.difference_update(impacted_facets)
 
     #computing the new CR reconstruction for impacted facets
     for f in impacted_facets:
         #if len(face_num.get(g)) > 1: #facet not on boundary otherwise reconstruction does not change
-        coord_bary,coord_num,connectivity_recon = test_symmetric_bary_coord(f,face_num,dim,d_,G_,nb_ddl_cells_)
+        coord_bary,coord_num,connectivity_recon = bary_coord(f, problem)
         tetra_coord_bary[f] = coord_bary
         tetra_coord_num[f] = coord_num
 
         #updating the connectivity_recon in the graph. Adding the new connectivity recon in graph.
         for k in connectivity_recon:
-            if(len(face_num.get(k))) == 2:
+            if(len(problem.facet_num.get(k))) == 2:
                 n1,n2 = face_num.get(k)
-                G_[n1][n2]['recon'].add(f)
+                problem.Graph[n1][n2]['recon'].add(f)
 
     #Putting-in the new barycentric coordinates for inner facet reconstruction that changed
     for f in impacted_facets:
-        if len(face_num.get(f)) > 1: #facet not on boundary
-            n1,n2 = face_num.get(f)
-            num_global_ddl = G_[n1][n2]['dof_CR']
+        if len(problem.facet_num.get(f)) > 1: #facet not on boundary
+            n1,n2 = problem.facet_num.get(f)
+            num_global_ddl = problem.Graph[n1][n2]['dof_CR']
         else: #facet on boundary
-            n = face_num.get(f)[0]
-            num_global_ddl = G_[n][f + nb_ddl_cells_ // d_]['dof_CR']
+            n = problem.facet_num.get(f)[0]
+            num_global_ddl = problem.Graph[n][f + nb_ddl_cells_ // d_]['dof_CR']
         #erasing previous values
         passage_CR_new[num_global_ddl[0],:] = np.zeros(passage_CR_new.shape[1])
         if d_ >= 2:
@@ -117,10 +111,12 @@ def adapting_after_crack(cracking_facets, already_cracked_facets, d_, dim, face_
                 passage_CR_new[num_global_ddl[2],i[2]] += j
 
     #Optimization
-    passage_CR_back = passage_CR_new.tocsr()
-    passage_CR_back.eliminate_zeros()
+    problem.DEM_to_CR = passage_CR_new.tocsr()
+    problem.DEM_to_CR.eliminate_zeros()
 
-    return mat_D, mat_not_D
+    return
+
+#What about mat_D and mat_not_D ??????????
 
 def adapting_grad_matrix(problem, cracking_facets):
     #Modifying the gradient reconstruction matrix

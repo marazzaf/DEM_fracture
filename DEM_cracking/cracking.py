@@ -46,7 +46,6 @@ def adapting_facet_reconstruction(self, cracking_facets, already_cracked_facets,
     #Modifying matrix passage_CR
     self.DEM_to_CR.resize((self.nb_dof_CR,self.nb_dof_DEM))
     passage_CR_new = self.DEM_to_CR.tolil()
-    
 
     tetra_coord_bary = dict()
     tetra_coord_num = dict()
@@ -139,7 +138,7 @@ def adapting_grad_matrix(self, cracking_facets):
         c2 = self.facet_num[-f][0]
         mat_grad_new[c2 * self.d * self.dim : (c2+1) * self.d * self.dim, :] = local_gradient_matrix(c2, self)
 
-    self.mat_grad = self.mat_grad.tocsr()
+    self.mat_grad = mat_grad_new.tocsr()
     
     return
 

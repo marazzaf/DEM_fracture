@@ -100,9 +100,6 @@ for (x,y) in problem.Graph.edges():
         cracking_facets.add(f)
         cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
 
-print(cracking_facets)
-sys.exit()
-
 #adapting after crack
 mat_jump_1_aux,mat_jump_2_aux = problem.removing_penalty(cracking_facets)
 problem.mat_jump_1 -= mat_jump_1_aux

@@ -9,11 +9,14 @@ from DEM_cracking.miscellaneous import *
 
 class DEMProblem:
     """ Class that will contain the basics of a DEM problem from the mesh and the dimension of the problem to reconstrucion matrices and gradient matrix."""
-    def __init__(self, mesh, d, penalty, nz_vec_BC):
+    def __init__(self, mesh, d, penalty, nz_vec_BC, mu, lambda_=0):
         self.mesh = mesh
         self.dim = self.mesh.geometric_dimension()
         self.d = d
         self.penalty = penalty
+        self.mu = mu
+        if self.d > 1:
+            self.lambda_ = lambda_
 
         #Define the necessary functionnal spaces depending on d
         if self.d == 1:
@@ -55,7 +58,7 @@ class DEMProblem:
         #self.mat_elas = self.elastic_bilinear_form(ref_elastic)
 
     #Importing methods
-    from DEM_cracking.cracking import adapting_graph,adapting_after_crack,adapting_facet_reconstruction,adapting_grad_matrix
+    from DEM_cracking.cracking import adapting_graph,adapting_after_crack,adapting_facet_reconstruction,adapting_grad_matrix,energy_release_rates
 
     def elastic_bilinear_form(self,ref_elastic):
         return  self.DEM_to_CR.T * self.mat_grad.T * ref_elastic * self.mat_grad * self.DEM_to_CR

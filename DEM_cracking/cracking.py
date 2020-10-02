@@ -234,7 +234,17 @@ def removing_penalty(self, cracking_facets):
                 for i in range(self.dim):
                     mat_jump_2[dof_CR,tens_dof_position[(num % self.d)*self.d + i]] = sign*pen_diff[i]
 
-    return mat_jump_1.tocsr(), mat_jump_2.tocsr()
+    #Removing penalty
+    self.mat_jump_1 -= mat_jump_1.tocsr()
+    self.mat_jump_2 -= mat_jump_2.tocsr()
+    return
+
+def update_penalty_matrix(self):
+    self.mat_jump_1.resize((self.nb_dof_CR,self.nb_dof_DEM))
+    self.mat_jump_2.resize((self.nb_dof_CR,self.nb_dof_grad))
+    self.mat_jump = self.mat_jump_1 + self.mat_jump_2 * self.mat_grad * self.DEM_to_CR
+    self.mat_pen = self.mat_jump.T * self.mat_jump
+    return
 
 def energy_release_rates(self, vec_u_CR, cracked_facets, not_breakable_facets):
     cracking_facets = set()
@@ -245,13 +255,13 @@ def energy_release_rates(self, vec_u_CR, cracked_facets, not_breakable_facets):
         stress_per_cell = stresses.reshape((self.nb_dof_cells // self.d,self.dim,self.dim))
 
     #Computing Gh
-    Gh = np.zeros(self.nb_dof_CR // d)
+    Gh = np.zeros(self.nb_dof_CR // self.d)
     for fp in cracked_facets:
         for f in self.facet_to_facet.get(fp) - not_breakable_facets:
             if len(self.facet_num.get(f)) == 2:
                 c1,c2 = self.facet_num.get(f)
                 c1p = self.facet_num.get(fp)[0]
-                normal = self.Graph[c1p][nb_ddl_cells // d + fp]['normal']
+                normal = self.Graph[c1p][self.nb_dof_cells // self.d + fp]['normal']
                 dist_1 = np.linalg.norm(self.Graph.nodes[c1]['pos'] - self.Graph[c1p][self.nb_dof_cells // self.d + fp]['barycentre'])
                 dist_2 = np.linalg.norm(self.Graph.nodes[c2]['pos'] - self.Graph[c1p][self.nb_dof_cells // self.d + fp]['barycentre'])
                 stress_1 = np.dot(stress_per_cell[c1],normal)

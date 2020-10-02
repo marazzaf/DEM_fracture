@@ -72,9 +72,6 @@ nz_vec_BC = set(nz_vec_BC)
 #Creating the DEM problem
 problem = DEMProblem(mesh, d, penalty, nz_vec_BC, mu)
 
-#Imposing strongly Dirichlet BC
-mat_not_D,mat_D = schur_matrices(problem)
-
 def eps(v): #v is a gradient matrix
     return v
 
@@ -123,20 +120,16 @@ for (x,y) in problem.Graph.edges():
 
 
 #adapting after crack
-old_mat_pen = problem.mat_pen
-mat_jump_1_aux,mat_jump_2_aux = removing_penalty(problem, cracking_facets)
-problem.mat_jump_1 -= mat_jump_1_aux
-problem.mat_jump_2 -= mat_jump_2_aux
-problem.adapting_after_crack(cracking_facets, cracked_facets) #Get problem as an output or make it a method of the class ?
+problem.removing_penalty(cracking_facets)
+problem.adapting_after_crack(cracking_facets, cracked_facets)
+problem.update_penalty_matrix()
+problem.elastic_bilinear_form(ref_elastic)
+A = problem.mat_elas + problem.mat_pen
+L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
+
+#After modifications
 out_cracked_facets(folder, size_ref, 0, cracked_facet_vertices, problem.dim) #paraview cracked facet file
 cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
-mat_elas = problem.elastic_bilinear_form(ref_elastic)
-problem.mat_jump_1.resize((problem.nb_dof_CR,problem.nb_dof_DEM))
-problem.mat_jump_2.resize((problem.nb_dof_CR,problem.nb_dof_grad))
-problem.mat_jump = problem.mat_jump_1 + problem.mat_jump_2 * problem.mat_grad * problem.DEM_to_CR
-mat_pen = problem.mat_jump.T * problem.mat_jump
-A = mat_elas + mat_pen
-L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
 
 #Updating facets that cannot be broken because they belong to a cell with an already broken facet
 not_breakable_facets |= cracked_facets #already broken facets cannot break again
@@ -144,9 +137,7 @@ for c in cells_with_cracked_facet:
     not_breakable_facets |= problem.facets_cell.get(c)
 
 #Imposing strongly Dirichlet BC
-A_D = mat_D * A * mat_D.T
-A_not_D = mat_not_D * A * mat_not_D.T
-B = mat_not_D * A * mat_D.T
+A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 T = 2. / k #1. / k
@@ -163,7 +154,7 @@ while u_D.t < T:
 
     #interpolation of Dirichlet BC
     FF = interpolate(u_D, U_CR).vector().get_local()
-    F = mat_D * problem.trace_matrix.T * FF
+    F = problem.mat_D * problem.trace_matrix.T * FF
 
     #taking into account exterior loads
     #L_not_D = mat_not_D * matrice_trace_bord.T * L
@@ -176,26 +167,22 @@ while u_D.t < T:
         print('COUNT: %i' % count)
         u_reduced,info = cg(A_not_D, L_not_D)
         assert(info == 0)
-        u = mat_not_D.T * u_reduced + mat_D.T * F
+        u = problem.complete_solution(u_reduced,u_D)
 
         #Post-processing
         vec_u_CR = problem.DEM_to_CR * u
         vec_u_DG = problem.DEM_to_DG * u
-        #facet_stresses = average_stresses * mat_grad * vec_u_CR
         stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
         stress_per_cell = stresses.reshape((problem.nb_dof_cells // problem.d,problem.dim))
-        #strain = mat_strain * mat_grad * vec_u_CR
-        #strain_per_cell = strain.reshape((nb_ddl_cells // d,dim))
 
         ##sorties paraview
         #if u_D.t % (T / 10) < dt:
-        solution_u_DG.vector().set_local(vec_u_DG)
-        solution_u_DG.vector().apply("insert")
-        file.write(solution_u_DG, u_D.t)
-        solution_stress.vector().set_local(problem.mat_stress * problem.mat_grad * vec_u_CR)
-        solution_stress.vector().apply("insert")
-        file.write(solution_stress, u_D.t)
-        sys.exit()
+        #solution_u_DG.vector().set_local(vec_u_DG)
+        #solution_u_DG.vector().apply("insert")
+        #file.write(solution_u_DG, u_D.t)
+        #solution_stress.vector().set_local(problem.mat_stress * problem.mat_grad * vec_u_CR)
+        #solution_stress.vector().apply("insert")
+        #file.write(solution_stress, u_D.t)
 
         cracking_facets = set()
         
@@ -209,79 +196,47 @@ while u_D.t < T:
         #Chossing which facet to break
         for f in indices:
             if Gh[f] > Gc:
-                #if len(test_1) == 0 and len(test_2) == 0:
                 cracking_facets = {f}
-                c1,c2 = facet_num.get(f)
-                print(Gh[f])
-                #print(G[c1][c2]['barycentre'])
-                cracked_facet_vertices.append(G[c1][c2]['vertices']) #position of vertices of the broken facet
+                c1,c2 = problem.facet_num.get(f)
                 cells_with_cracked_facet |= {c1,c2}
-                not_breakable_facets |= (facets_cell.get(c1) | facets_cell.get(c2))
-                #potentially_cracking_facets |= facet_to_facet.get(f) #updating set
-                #cells_to_test |= set(facet_num.get(f))
+                not_breakable_facets |= (problem.facets_cell.get(c1) | problem.facets_cell.get(c2))
                 break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
             else:
                 inverting = False
 
         if len(cracking_facets) > 0:
-            #print(cracking_facets)
             solution_u_DG.vector().set_local(vec_u_DG)
             solution_u_DG.vector().apply("insert")
             file.write(solution_u_DG, u_D.t)
-            solution_stress.vector().set_local(mat_stress * mat_grad * vec_u_CR)
+            solution_stress.vector().set_local(problem.mat_stress * problem.mat_grad * vec_u_CR)
             solution_stress.vector().apply("insert")
             file.write(solution_stress, u_D.t)
 
         #get correspondance between dof
         for f in cracking_facets:
-            #sys.exit()
-            n1,n2 = facet_num.get(f)
-            cracked_facet_vertices.append(G[n1][n2]['vertices']) #position of vertices of the broken facet
-            pos = G[n1][n2]['barycentre']
-            #print('dof num: %i' % f)
+            n1,n2 = problem.facet_num.get(f)
+            cracked_facet_vertices.append(problem.Graph[n1][n2]['vertices']) #position of vertices of the broken facet
+            pos = problem.Graph[n1][n2]['barycentre']
             print('pos bary facet : (%f,%f)' % (pos[0], pos[1]))
-            #potentially_cracking_facets -= (facets_cell.get(n1) | facets_cell.get(n2)) #so that no other facet of these two cells will break
 
-#        #to be sure not to break facets of a cell that already has a broken facet
-#        for f in cracked_facets:
-#            c1 = facet_num.get(f)[0]
-#            potentially_cracking_facets -= facets_cell.get(c1)
 
         #treatment if the crack propagates
         if len(cracking_facets) > 0:
-            #storing the number of ccG dof before adding the new facet dofs
-            old_nb_dof_ccG = nb_ddl_ccG
-
-            count_output_crack +=1
-            ##recomputing boundary of the crack
-            #for n_facet in cracking_facets:
-            #    crack.node[n_facet]['broken'] = True
-            #bnd_crack = boundary_crack_new(crack,dim,cracking_facets,broken_vertices)
-
             #adapting after crack
-            #penalty terms modification
-            mat_jump_1_aux,mat_jump_2_aux = removing_penalty(mesh, d, dim, nb_ddl_ccG, mat_grad, passage_ccG_to_CR, G, nb_ddl_CR, cracking_facets, facet_num)
-            mat_jump_1 -= mat_jump_1_aux
-            mat_jump_2 -= mat_jump_2_aux
-            passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)
-            out_cracked_facets(folder, size_ref, count_output_crack, cracked_facet_vertices, dim) #paraview cracked facet file
-
-            #assembling new rigidity matrix and mass matrix after cracking
-            mat_elas = elastic_term(mat_grad, passage_ccG_to_CR)
-            passage_ccG_to_DG_1 = ccG_to_DG_1_aux_1 + ccG_to_DG_1_aux_2 * mat_grad * passage_ccG_to_CR #recomputed
-            #penalty_terms modification
-            mat_jump_1.resize((nb_ddl_CR,nb_ddl_ccG))
-            mat_jump_2.resize((nb_ddl_CR,nb_ddl_grad))
-            mat_jump = mat_jump_1 + mat_jump_2 * mat_grad * passage_ccG_to_CR
-            mat_pen = mat_jump.T * mat_jump
-            A = mat_elas + mat_pen #n'a pas de termes pour certains dof qu'on vient de créer
+            problem.removing_penalty(cracking_facets)
+            problem.adapting_after_crack(cracking_facets, cracked_facets)
+            problem.update_penalty_matrix()
+            problem.elastic_bilinear_form(ref_elastic)
+            A = problem.mat_elas + problem.mat_pen
             L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
 
+            #Crack output
+            count_output_crack +=1
+            out_cracked_facets(folder, size_ref, count_output_crack, cracked_facet_vertices, problem.dim) #paraview cracked facet file
+
             #Imposing strongly Dirichlet BC
-            A_D = mat_D * A * mat_D.T
-            A_not_D = mat_not_D * A * mat_not_D.T
-            B = mat_not_D * A * mat_D.T
-            F = mat_D * trace_matrix.T * FF
+            A_not_D,B = problem.schur_complement(A)
+            F = problem.mat_D * problem.trace_matrix.T * FF
             L_not_D = -B * F
 
         cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets

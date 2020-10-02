@@ -73,6 +73,15 @@ def schur_matrices(self):
         mat_D[i,j] = 1.
     return mat_not_D.tocsr(), mat_D.tocsr()
 
+def schur_complement(self, A):
+    """ Returns the matrices of the Schur complement to remove the vqlues of Dirichlet dofs impose strongly. """
+    
+    #A_D = self.mat_D * A * self.mat_D.T
+    A_not_D = self.mat_not_D * A * self.mat_not_D.T
+    B = self.mat_not_D * A * self.mat_D.T
+    
+    return A_not_D,B
+
 def output_stress(problem, sigma=grad, eps=grad):
     vol = CellVolume(problem.mesh)
     Du_DG = TrialFunction(problem.W)

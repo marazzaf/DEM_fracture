@@ -57,10 +57,13 @@ class DEMProblem:
 
         #Penalty matrix
         self.mat_pen,self.mat_jump_1,self.mat_jump_2 = penalty_term(self, nz_vec_BC)
-        #self.mat_elas = self.elastic_bilinear_form(ref_elastic)
+
+        #Schur matrices to impose strongly BC
+        self.mat_not_D,self.mat_D = schur_matrices(self)
 
     #Importing methods
     from DEM_cracking.cracking import adapting_graph,adapting_after_crack,adapting_facet_reconstruction,adapting_grad_matrix,energy_release_rates
+    from DEM_cracking.miscellaneous import schur_matrices,DEM_interpolation,complete_solution
 
     def elastic_bilinear_form(self,ref_elastic):
         return  self.DEM_to_CR.T * self.mat_grad.T * ref_elastic * self.mat_grad * self.DEM_to_CR

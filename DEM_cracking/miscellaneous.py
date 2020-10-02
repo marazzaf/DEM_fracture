@@ -47,14 +47,10 @@ def gradient_matrix(problem):
     row,col,val = as_backend_type(A).mat().getValuesCSR()
     return csr_matrix((val, col, row))
 
-def DEM_interpolation(func, problem):
+def DEM_interpolation(self, func):
     """Interpolates a function or expression to return a DEM vector containg the interpolation."""
 
-    return problem.DEM_to_DG.T * local_project(func, problem.DG_0).vector().get_local() + problem.DEM_to_CG.T * local_project(func, problem.CG).vector().get_local()
-
-def Dirichlet_BC(form, DEM_to_CG):
-    L = assemble(form)
-    return DEM_to_CG.T * L.get_local()
+    return self.DEM_to_DG.T * local_project(func, self.DG_0).vector().get_local() + self.trace_matrix.T * local_project(func, self.CR).vector().get_local()
 
 def assemble_volume_load(load, problem):
     v = TestFunction(problem.DG_0)
@@ -62,17 +58,17 @@ def assemble_volume_load(load, problem):
     L = assemble(form)
     return problem.DEM_to_DG.T * L
 
-def schur_matrices(problem):
-    aux = list(np.arange(problem.nb_dof_cells))
-    aux_bis = list(np.arange(problem.nb_dof_cells, problem.nb_dof_DEM))
+def schur_matrices(self):
+    aux = list(np.arange(self.nb_dof_cells))
+    aux_bis = list(np.arange(self.nb_dof_cells, self.nb_dof_DEM))
 
     #Get non Dirichlet values
-    mat_not_D = dok_matrix((problem.nb_dof_cells, problem.nb_dof_DEM))
+    mat_not_D = dok_matrix((self.nb_dof_cells, self.nb_dof_DEM))
     for (i,j) in zip(range(mat_not_D.shape[0]),aux):
         mat_not_D[i,j] = 1.
 
     #Get Dirichlet boundary conditions
-    mat_D = dok_matrix((problem.nb_dof_DEM - problem.nb_dof_cells, problem.nb_dof_DEM))
+    mat_D = dok_matrix((self.nb_dof_DEM - self.nb_dof_cells, self.nb_dof_DEM))
     for (i,j) in zip(range(mat_D.shape[0]),aux_bis):
         mat_D[i,j] = 1.
     return mat_not_D.tocsr(), mat_D.tocsr()
@@ -88,3 +84,6 @@ def output_stress(problem, sigma=grad, eps=grad):
     mat_stress = csr_matrix((val, col, row))
     
     return mat_stress
+
+def complete_solution(self, u_reduced, u_D):
+    return self.mat_not_D.T * u_reduced + self.trace_matrix.T * np.nan_to_num(interpolate(u_D, self.CR).vector().get_local())

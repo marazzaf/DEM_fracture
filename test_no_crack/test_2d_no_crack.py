@@ -65,9 +65,6 @@ nz_vec_BC = set(nz_vec_BC)
 #Creating the DEM problem
 problem = DEMProblem(mesh, 2, penalty, nz_vec_BC, mu, lambda_)
 
-#Imposing strongly Dirichlet BC
-mat_not_D,mat_D = schur_matrices(problem)
-
 def eps(v):
     return sym(v)
 
@@ -97,18 +94,16 @@ file = File('test.pvd')
 A = mat_elas + problem.mat_pen
 
 #Removing Dirichlet BC
-A_not_D = mat_not_D * A * mat_not_D.T
+A_not_D = problem.mat_not_D * A * problem.mat_not_D.T
 #rhs
-rhs = -mat_not_D * A * problem.trace_matrix.T * np.nan_to_num(interpolate(u_D, U_CR).vector().get_local())
+rhs = -problem.mat_not_D * A * problem.trace_matrix.T * np.nan_to_num(interpolate(u_D, U_CR).vector().get_local())
 
 #inverting system
 #u_reduced = spsolve(A_not_D, rhs)
 u_reduced,info = cg(A_not_D, rhs)
 assert(info == 0)
 
-u = mat_not_D.T * u_reduced + problem.trace_matrix.T * np.nan_to_num(interpolate(u_D, U_CR).vector().get_local())
-
-#sys.exit()
+u = problem.complete_solution(u_reduced, u_D)
 
 #Post-processing
 vec_u_CR = problem.DEM_to_CR * u
@@ -121,8 +116,6 @@ file.write(solution_u_DG, 0)
 solution_stress.vector().set_local(problem.mat_stress * problem.mat_grad * vec_u_CR)
 solution_stress.vector().apply("insert")
 file.write(solution_stress, 0)
-
-print('Intial elastic energy: %.5e' % (0.5 * np.dot(u, A * u)))
 
 #computation over
 print('End of computation !')

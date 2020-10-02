@@ -126,11 +126,11 @@ for (x,y) in problem.Graph.edges():
 mat_jump_1_aux,mat_jump_2_aux = removing_penalty(problem, cracking_facets)
 problem.mat_jump_1 -= mat_jump_1_aux
 problem.mat_jump_2 -= mat_jump_2_aux
-impacted_facets = problem.adapting_graph(cracking_facets)
-sys.exit()
-adapting_after_crack(problem, cracking_facets, cracked_facets) #Get problem as an output or make it a method of the class ?
+problem.adapting_after_crack(cracking_facets, cracked_facets) #Get problem as an output or make it a method of the class ?
 out_cracked_facets(folder, size_ref, 0, cracked_facet_vertices, problem.dim) #paraview cracked facet file
 cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
+print(cracked_facets)
+sys.exit()
 mat_elas = problem.elastic_bilinear_form(ref_elastic)
 problem.mat_jump_1.resize((problem.nb_dof_CR,problem.nb_dof_DEM))
 problem.mat_jump_2.resize((problem.nb_dof_CR,problem.nb_dof_grad))
@@ -159,7 +159,7 @@ T = 2. / k #1. / k
 chi = 4.5
 dt = h / (k * chi)
 #print(dt)
-u_D.t = 0.35 / k #il ne se passe rien avant...
+u_D.t = 0.25 / k #il ne se passe rien avant...
 
 #Début boucle temporelle
 while u_D.t < T:

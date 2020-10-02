@@ -4,10 +4,10 @@ from DEM_cracking.facet_reconstruction import bary_coord
 from scipy.sparse import lil_matrix,dok_matrix
 import networkx as nx
 
-def adapting_after_crack(problem, cracking_facets, already_cracked_facets):
-    impacted_facets = adapting_graph(problem, cracking_facets)
-    adapting_facet_reconstruction(problem, cracking_facets, already_cracked_facets, impacted_facets)
-    adapting_grad_matrix(problem, cracking_facets)
+def adapting_after_crack(self, cracking_facets, already_cracked_facets):
+    impacted_facets = self.adapting_graph(cracking_facets)
+    self.adapting_facet_reconstruction(cracking_facets, already_cracked_facets, impacted_facets)
+    self.adapting_grad_matrix(cracking_facets)
     return
 
 def adapting_graph(self, cracking_facets):
@@ -42,10 +42,10 @@ def adapting_graph(self, cracking_facets):
 
     return impacted_facets #will be used to update CR reconstruction
 
-def adapting_facet_reconstruction(problem, cracking_facets, already_cracked_facets, impacted_facets):
+def adapting_facet_reconstruction(self, cracking_facets, already_cracked_facets, impacted_facets):
     #Modifying matrix passage_CR
-    problem.DEM_to_CR.resize((problem.nb_dof_CR,problem.nb_dof_DEM))
-    passage_CR_new = problem.DEM_to_CR.tolil()
+    self.DEM_to_CR.resize((self.nb_dof_CR,self.nb_dof_DEM))
+    passage_CR_new = self.DEM_to_CR.tolil()
     
 
     tetra_coord_bary = dict()
@@ -53,95 +53,95 @@ def adapting_facet_reconstruction(problem, cracking_facets, already_cracked_face
     #fill rows for new dof
     #Putting ones in new facet dofs and putting 0 where there were barycentric reconstructions
     for f in cracking_facets:
-        n1 = problem.facet_num.get(f)[0]
-        n2 = problem.facet_num.get(-f)[0]
-        num_global_ddl_1 = problem.Graph[n1][f + problem.nb_dof_cells // problem.d]['dof_CR']
-        num_global_ddl_2 = problem.Graph[-f - problem.nb_dof_cells // problem.d][n2]['dof_CR']
+        n1 = self.facet_num.get(f)[0]
+        n2 = self.facet_num.get(-f)[0]
+        num_global_ddl_1 = self.Graph[n1][f + self.nb_dof_cells // self.d]['dof_CR']
+        num_global_ddl_2 = self.Graph[-f - self.nb_dof_cells // self.d][n2]['dof_CR']
             
         #deleting previous barycentric reconstruction
         passage_CR_new[num_global_ddl_1[0], :] = np.zeros(passage_CR_new.shape[1])
-        if problem.d >= 2: #deuxième ligne
+        if self.d >= 2: #deuxième ligne
             passage_CR_new[num_global_ddl_1[1], :] = np.zeros(passage_CR_new.shape[1])
-        if problem.d == 3: #troisième ligne
+        if self.d == 3: #troisième ligne
             passage_CR_new[num_global_ddl_1[2], :] = np.zeros(passage_CR_new.shape[1])
         #recomputing the CR reconstruction
-        coord_bary_1,coord_num_1,connectivity_recon_1 = bary_coord(f, problem)
-        coord_bary_2,coord_num_2,connectivity_recon_2 = bary_coord(-f, problem)
+        coord_bary_1,coord_num_1,connectivity_recon_1 = bary_coord(f, self)
+        coord_bary_2,coord_num_2,connectivity_recon_2 = bary_coord(-f, self)
 
         #Filling-in the new reconstruction
         for i1,j1,i2,j2 in zip(coord_num_1,coord_bary_1,coord_num_2,coord_bary_2):
             passage_CR_new[num_global_ddl_1[0],i1[0]] += j1
             passage_CR_new[num_global_ddl_2[0],i2[0]] += j2 
-            if problem.d >= 2:
+            if self.d >= 2:
                 passage_CR_new[num_global_ddl_1[1],i1[1]] += j1
                 passage_CR_new[num_global_ddl_2[1],i2[1]] += j2
-            if problem.d == 3:
+            if self.d == 3:
                 passage_CR_new[num_global_ddl_1[2],i1[2]] += j1
                 passage_CR_new[num_global_ddl_2[2],i2[2]] += j2
 
     impacted_facets.difference_update(already_cracked_facets) #removing already cracked facets from the set of facets that need a new CR reconstruction
 
     #The connectivity recon will be recomputed. Thus retrieving the num of the facet from the potentially impacted. Will be upadted afterwards.
-    for (u,v,r) in problem.Graph.edges(data='recon'):
+    for (u,v,r) in self.Graph.edges(data='recon'):
         if r != None:
             r.difference_update(impacted_facets)
 
     #computing the new CR reconstruction for impacted facets
     for f in impacted_facets:
         #if len(face_num.get(g)) > 1: #facet not on boundary otherwise reconstruction does not change
-        coord_bary,coord_num,connectivity_recon = bary_coord(f, problem)
+        coord_bary,coord_num,connectivity_recon = bary_coord(f, self)
         tetra_coord_bary[f] = coord_bary
         tetra_coord_num[f] = coord_num
 
         #updating the connectivity_recon in the graph. Adding the new connectivity recon in graph.
         for k in connectivity_recon:
-            if(len(problem.facet_num.get(k))) == 2:
-                n1,n2 = problem.facet_num.get(k)
-                problem.Graph[n1][n2]['recon'].add(f)
+            if(len(self.facet_num.get(k))) == 2:
+                n1,n2 = self.facet_num.get(k)
+                self.Graph[n1][n2]['recon'].add(f)
 
     #Putting-in the new barycentric coordinates for inner facet reconstruction that changed
     for f in impacted_facets:
-        if len(problem.facet_num.get(f)) > 1: #facet not on boundary
-            n1,n2 = problem.facet_num.get(f)
-            num_global_ddl = problem.Graph[n1][n2]['dof_CR']
+        if len(self.facet_num.get(f)) > 1: #facet not on boundary
+            n1,n2 = self.facet_num.get(f)
+            num_global_ddl = self.Graph[n1][n2]['dof_CR']
         else: #facet on boundary
-            n = problem.facet_num.get(f)[0]
-            num_global_ddl = problem.Graph[n][f + problem.nb_dof_cells // problem.d]['dof_CR']
+            n = self.facet_num.get(f)[0]
+            num_global_ddl = self.Graph[n][f + self.nb_dof_cells // self.d]['dof_CR']
         #erasing previous values
         passage_CR_new[num_global_ddl[0],:] = np.zeros(passage_CR_new.shape[1])
-        if problem.d >= 2:
+        if self.d >= 2:
             passage_CR_new[num_global_ddl[1],:] = np.zeros(passage_CR_new.shape[1])
-        if problem.d == 3:
+        if self.d == 3:
             passage_CR_new[num_global_ddl[2],:] = np.zeros(passage_CR_new.shape[1])
             #Putting new values in
         for i,j in zip(tetra_coord_num.get(f),tetra_coord_bary.get(f)):
             passage_CR_new[num_global_ddl[0],i[0]] += j 
-            if problem.d >= 2:
+            if self.d >= 2:
                 passage_CR_new[num_global_ddl[1],i[1]] += j
-            if problem.d == 3:
+            if self.d == 3:
                 passage_CR_new[num_global_ddl[2],i[2]] += j
 
     #Optimization
-    problem.DEM_to_CR = passage_CR_new.tocsr()
-    problem.DEM_to_CR.eliminate_zeros()
+    self.DEM_to_CR = passage_CR_new.tocsr()
+    self.DEM_to_CR.eliminate_zeros()
 
     return
 
 #What about mat_D and mat_not_D ??????????
 
-def adapting_grad_matrix(problem, cracking_facets):
+def adapting_grad_matrix(self, cracking_facets):
     #Modifying the gradient reconstruction matrix
     #No renumbering because uses CR dofs and not ccG dofs !!!
-    problem.mat_grad.resize((problem.mat_grad.shape[0],problem.nb_dof_CR))
-    mat_grad_new = problem.mat_grad.tolil() #only changes for cells having a facet that broke
+    self.mat_grad.resize((self.mat_grad.shape[0],self.nb_dof_CR))
+    mat_grad_new = self.mat_grad.tolil() #only changes for cells having a facet that broke
     for f in cracking_facets:
         #first newly facet dof and associated cell
-        c1 = problem.facet_num[f][0]
-        mat_grad_new[c1 * problem.d * problem.dim : (c1+1) * problem.d * problem.dim, :] = local_gradient_matrix(c1, problem)
-        c2 = problem.facet_num[-f][0]
-        mat_grad_new[c2 * problem.d * problem.dim : (c2+1) * problem.d * problem.dim, :] = local_gradient_matrix(c2, problem)
+        c1 = self.facet_num[f][0]
+        mat_grad_new[c1 * self.d * self.dim : (c1+1) * self.d * self.dim, :] = local_gradient_matrix(c1, self)
+        c2 = self.facet_num[-f][0]
+        mat_grad_new[c2 * self.d * self.dim : (c2+1) * self.d * self.dim, :] = local_gradient_matrix(c2, self)
 
-    problem.mat_grad = problem.mat_grad.tocsr()
+    self.mat_grad = self.mat_grad.tocsr()
     
     return
 

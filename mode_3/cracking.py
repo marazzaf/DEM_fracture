@@ -126,6 +126,8 @@ for (x,y) in problem.Graph.edges():
 mat_jump_1_aux,mat_jump_2_aux = removing_penalty(problem, cracking_facets)
 problem.mat_jump_1 -= mat_jump_1_aux
 problem.mat_jump_2 -= mat_jump_2_aux
+impacted_facets = problem.adapting_graph(cracking_facets)
+sys.exit()
 adapting_after_crack(problem, cracking_facets, cracked_facets) #Get problem as an output or make it a method of the class ?
 out_cracked_facets(folder, size_ref, 0, cracked_facet_vertices, problem.dim) #paraview cracked facet file
 cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets

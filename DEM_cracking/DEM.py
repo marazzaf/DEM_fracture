@@ -54,6 +54,9 @@ class DEMProblem:
         self.mat_pen,self.mat_jump_1,self.mat_jump_2 = penalty_term(self, nz_vec_BC)
         #self.mat_elas = self.elastic_bilinear_form(ref_elastic)
 
+    #Importing methods
+    from DEM_cracking.cracking import adapting_graph
+
     def elastic_bilinear_form(self,ref_elastic):
         return  self.DEM_to_CR.T * self.mat_grad.T * ref_elastic * self.mat_grad * self.DEM_to_CR
 

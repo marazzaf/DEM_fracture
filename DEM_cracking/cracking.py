@@ -10,35 +10,35 @@ def adapting_after_crack(problem, cracking_facets, already_cracked_facets):
     adapting_grad_matrix(problem, cracking_facets)
     return
 
-def adapting_graph(problem, cracking_facets):
+def adapting_graph(self, cracking_facets):
     impacted_facets = set()
     #Modifying connectivity graph
     for f in cracking_facets:
-        n1,n2 = problem.facet_num.get(f) #n1 : plus, n2 : minus    
+        n1,n2 = self.facet_num.get(f) #n1 : plus, n2 : minus    
         #retrieving facets impacted by rutpure:
-        impacted_facets.update(problem.Graph[n1][n2]['recon']) #impacted facets will have a new CR reconstruction
-        ex_dofs = problem.Graph[n1][n2]['dof_CR']
-        ex_num = problem.Graph[n1][n2]['num']
-        ex_bary = problem.Graph[n1][n2]['barycentre']
-        ex_normal = problem.Graph[n1][n2]['normal']
-        ex_measure = problem.Graph[n1][n2]['measure']
-        ex_vertices = problem.Graph[n1][n2]['vertices']
-        ex_pen = problem.Graph[n1][n2]['pen_factor']
+        impacted_facets.update(self.Graph[n1][n2]['recon']) #impacted facets will have a new CR reconstruction
+        ex_dofs = self.Graph[n1][n2]['dof_CR']
+        ex_num = self.Graph[n1][n2]['num']
+        ex_bary = self.Graph[n1][n2]['barycentre']
+        ex_normal = self.Graph[n1][n2]['normal']
+        ex_measure = self.Graph[n1][n2]['measure']
+        ex_vertices = self.Graph[n1][n2]['vertices']
+        ex_pen = self.Graph[n1][n2]['pen_factor']
         
         #removing link between the two cell dofs
-        problem.Graph.remove_edge(n1,n2)
+        self.Graph.remove_edge(n1,n2)
         
         #adding the new facet dofs
-        problem.Graph.add_node(problem.nb_dof_cells // problem.d + f, pos=ex_bary, sign=int(1), vertices=np.array([])) #linked with n1
-        problem.Graph.add_node(-problem.nb_dof_cells // problem.d - f, pos=ex_bary, sign=int(-1), vertices=np.array([])) #linked with n2
+        self.Graph.add_node(self.nb_dof_cells // self.d + f, pos=ex_bary, sign=int(1), vertices=np.array([])) #linked with n1
+        self.Graph.add_node(-self.nb_dof_cells // self.d - f, pos=ex_bary, sign=int(-1), vertices=np.array([])) #linked with n2
 
         #adding the connectivity between cell dofs and new facet dofs
-        problem.Graph.add_edge(n1, problem.nb_dof_cells // problem.d + f, num=ex_num, dof_CR=ex_dofs, measure=ex_measure, barycentre=ex_bary, normal=ex_normal, breakable=False, vertices=ex_vertices, pen_factor = ex_pen)
-        problem.facet_num[f] = [n1]
-        new_dof_CR = list(np.arange(problem.nb_dof_CR, problem.nb_dof_CR+problem.d))
-        problem.Graph.add_edge(-problem.nb_dof_cells // problem.d - f, n2, num=problem.nb_dof_CR//problem.d, dof_CR=new_dof_CR, measure=ex_measure, barycentre=ex_bary, normal=ex_normal, breakable=False, vertices=ex_vertices, pen_factor = ex_pen)
-        problem.nb_dof_CR += problem.d
-        problem.facet_num[-f] = [n2]
+        self.Graph.add_edge(n1, self.nb_dof_cells // self.d + f, num=ex_num, dof_CR=ex_dofs, measure=ex_measure, barycentre=ex_bary, normal=ex_normal, breakable=False, vertices=ex_vertices, pen_factor = ex_pen)
+        self.facet_num[f] = [n1]
+        new_dof_CR = list(np.arange(self.nb_dof_CR, self.nb_dof_CR+self.d))
+        self.Graph.add_edge(-self.nb_dof_cells // self.d - f, n2, num=self.nb_dof_CR//self.d, dof_CR=new_dof_CR, measure=ex_measure, barycentre=ex_bary, normal=ex_normal, breakable=False, vertices=ex_vertices, pen_factor = ex_pen)
+        self.nb_dof_CR += self.d
+        self.facet_num[-f] = [n2]
 
     return impacted_facets #will be used to update CR reconstruction
 

@@ -237,7 +237,7 @@ def removing_penalty(problem, cracking_facets):
 
     return mat_jump_1.tocsr(), mat_jump_2.tocsr()
 
-def energy_release_rates(self, vec_u_CR, cracked_facets):
+def energy_release_rates(self, vec_u_CR, cracked_facets, not_breakable_facets):
     cracking_facets = set()
     stresses = self.mat_stress * self.mat_grad * vec_u_CR
     if self.d == 1:
@@ -246,27 +246,27 @@ def energy_release_rates(self, vec_u_CR, cracked_facets):
         stress_per_cell = stresses.reshape((self.nb_dof_cells // self.d,self.dim,self.dim))
 
     #Computing Gh
-    Gh = np.zeros(nb_ddl_CR // d)
+    Gh = np.zeros(self.nb_dof_CR // d)
     for fp in cracked_facets:
         for f in self.facet_to_facet.get(fp) - not_breakable_facets:
             if len(self.facet_num.get(f)) == 2:
                 c1,c2 = self.facet_num.get(f)
                 c1p = self.facet_num.get(fp)[0]
                 normal = self.Graph[c1p][nb_ddl_cells // d + fp]['normal']
-                dist_1 = np.linalg.norm(self.Graph.nodes[c1]['pos'] - self.Graph[c1p][nb_ddl_cells // d + fp]['barycentre'])
-                dist_2 = np.linalg.norm(self.Graph.nodes[c2]['pos'] - self.Graph[c1p][nb_ddl_cells // d + fp]['barycentre'])
+                dist_1 = np.linalg.norm(self.Graph.nodes[c1]['pos'] - self.Graph[c1p][self.nb_dof_cells // self.d + fp]['barycentre'])
+                dist_2 = np.linalg.norm(self.Graph.nodes[c2]['pos'] - self.Graph[c1p][self.nb_dof_cells // self.d + fp]['barycentre'])
                 stress_1 = np.dot(stress_per_cell[c1],normal)
                 stress_2 = np.dot(stress_per_cell[c2],normal)
             if self.d == 1:
                 G1 = stress_1 * stress_1
-                G1 *= np.pi / mu * dist_1
+                G1 *= np.pi / self.mu * dist_1
                 G2 = stress_2 * stress_2
-                G2 *= np.pi / mu * dist_2
+                G2 *= np.pi / self.mu * dist_2
             else:
                 G1 = np.dot(stress_1,stress_1)
-                G1 *= np.pi / E * dist_1
+                G1 *= np.pi / self.E * dist_1
                 G2 = np.dot(stress_2,stress_2)
-                G2 *= np.pi / E * dist_2
+                G2 *= np.pi / self.E * dist_2
 
             Gh[f] = np.sqrt(G1*G2) #looks all right...
                 

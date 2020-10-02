@@ -17,6 +17,8 @@ class DEMProblem:
         self.mu = mu
         if self.d > 1:
             self.lambda_ = lambda_
+            self.nu = 0.5 * self.lambda_ / (self.lambda_ + self.mu)
+            self.E = self.mu * (3*self.lambda_+2*self.mu) / (self.lambda_ + self.mu)
 
         #Define the necessary functionnal spaces depending on d
         if self.d == 1:

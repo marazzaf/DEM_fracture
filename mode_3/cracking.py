@@ -200,11 +200,13 @@ while u_D.t < T:
         cracking_facets = set()
         
         #Computing new Gh
-        Gh = problem.energy_release_rates(vec_u_CR, cracked_facets)
+        Gh = problem.energy_release_rates(vec_u_CR, cracked_facets, not_breakable_facets)
 
         #Potentially cracking facet with biggest Gh
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
+        indices = idx[np.argsort((-Gh)[idx])]
 
+        #Chossing which facet to break
         for f in indices:
             if Gh[f] > Gc:
                 #if len(test_1) == 0 and len(test_2) == 0:

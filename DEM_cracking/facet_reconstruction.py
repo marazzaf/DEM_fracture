@@ -56,7 +56,7 @@ def bary_coord(num_facet, problem):
         #computing the two (or three) reconstructions
         list_positions = []
         for l in nei_to_nei:
-            list_positions.append([problem.Graph.node[c1]['pos'], problem.Graph.node[c2]['pos'], problem.Graph.node[l]['pos']])
+            list_positions.append([problem.Graph.nodes[c1]['pos'], problem.Graph.nodes[c2]['pos'], problem.Graph.nodes[l]['pos']])
 
         #Computation of barycentric coordinates
         coords = np.array([])
@@ -83,7 +83,7 @@ def bary_coord(num_facet, problem):
             #getting dofs used in the CR reconstruction
             coord_num = []
             for l in path:
-                coord_num.append(problem.Graph.node[l]['dof'])
+                coord_num.append(problem.Graph.nodes[l]['dof'])
             #Getting the link between dofs through facets in case of breaking
             aux_aux = set()
             intersection_1 = set(path_1)
@@ -104,7 +104,7 @@ def bary_coord(num_facet, problem):
 
         else: #break the facet ????
             chosen_coord_bary = np.ones(problem.d)
-            coord_num = [problem.Graph.node[c1]['dof']]
+            coord_num = [problem.Graph.nodes[c1]['dof']]
             aux_aux = set()
 
 
@@ -145,7 +145,7 @@ def bary_coord(num_facet, problem):
             else:
                 dof_CR = problem.Graph[c1][num_facet - problem.nb_dof_cells // problem.d]['dof_CR']
             chosen_coord_bary = [np.ones(problem.d)]
-            coord_num = [problem.Graph.node[c1]['dof']]
+            coord_num = [problem.Graph.nodes[c1]['dof']]
             aux_aux = set()
 
         else: #Cell did not detach
@@ -156,7 +156,7 @@ def bary_coord(num_facet, problem):
             for dof_num in combinations(nei_to_nei, problem.dim+1): #test reconstruction with a set of right size
                 list_positions = []   
                 for l in dof_num:
-                    list_positions.append(problem.Graph.node[l]['pos'])
+                    list_positions.append(problem.Graph.nodes[l]['pos'])
 
                 #Computation of barycentric coordinates
                 A = np.array(list_positions)
@@ -171,8 +171,8 @@ def bary_coord(num_facet, problem):
                         chosen_coord_bary = np.append(1. - aux_coord_bary.sum(), aux_coord_bary)
                         coord_num = []
                         for l in dof_num:
-                            assert len(problem.Graph.node[l]['dof']) > 0
-                            coord_num.append(problem.Graph.node[l]['dof'])
+                            assert len(problem.Graph.nodes[l]['dof']) > 0
+                            coord_num.append(problem.Graph.nodes[l]['dof'])
 
                         #Il va falloir remplir le aux_aux...
                         aux_aux = set()

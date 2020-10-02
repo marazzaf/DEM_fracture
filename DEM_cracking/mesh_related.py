@@ -43,7 +43,7 @@ def connectivity_graph(problem, dirichlet_dofs):
     f_DG = TestFunction(scalar_DG)
     scalar_CR = FunctionSpace(problem.mesh, 'CR', 1) #for surfaces
     f_CR = TestFunction(scalar_CR)
-    vectorial_CR = VectorFunctionSpace(mesh_, 'CR', 1) #for normals
+    vectorial_CR = VectorFunctionSpace(problem.mesh, 'CR', 1) #for normals
     v_CR = TestFunction(vectorial_CR)
 
     #assembling penalty factor
@@ -56,7 +56,7 @@ def connectivity_graph(problem, dirichlet_dofs):
     areas = assemble(f_CR('+') * (dS + ds)).get_local()
     assert(areas.min() > 0.)
     normals_aux = assemble( dot(n('-'), v_CR('-')) / hF('-') * dS + dot(n, v_CR) / hF * ds ).get_local()
-    normals = normals_aux.reshape((nb_ddl_CR // d_, dim))
+    normals = normals_aux.reshape((problem.nb_dof_CR // problem.d, problem.dim))
 
     #importing cell dofs
     for c in cells(problem.mesh): #Importing cells
@@ -86,7 +86,7 @@ def connectivity_graph(problem, dirichlet_dofs):
         for v in vertices(f):
             vert.append( np.array(v.point()[:])[:problem.dim] )
             vert_ind.append(v.index())
-        normal = normals[num_global_ddl_facet[0] // d_, :]
+        normal = normals[num_global_ddl_facet[0] // problem.d, :]
         area = areas[num_global_ddl_facet[0] // problem.d]
         #facet barycentre computation
         vert = np.array(vert)
@@ -101,16 +101,16 @@ def connectivity_graph(problem, dirichlet_dofs):
         if len(aux_bis) == 2: #add the link between two cell dofs
             #putting normals in the order of lowest cell number towards biggest cell number
             n1 = min(aux_bis[0],aux_bis[1])
-            bary_n1 = G.node[n1]['pos']
+            bary_n1 = G.nodes[n1]['pos']
             n2 = max(aux_bis[0],aux_bis[1])
-            bary_n2 = G.node[n2]['pos']
+            bary_n2 = G.nodes[n2]['pos']
          
             #adding edge
             G.add_edge(aux_bis[0],aux_bis[1], num=num_global_ddl_facet[0] // problem.d, recon=set([]), dof_CR=num_global_ddl_facet, measure=area, barycentre=bary, normal=normal, vertices=vert, pen_factor=pen_factor[num_global_ddl_facet[0] // problem.d], breakable=True) #, vertices_ind=vert_ind)
             
         elif len(aux_bis) == 1: #add the link between a cell dof and a boundary facet dof
             for c in cells(f): #only one cell contains the boundary facet
-                bary_cell = G.node[c.index()]['pos']
+                bary_cell = G.nodes[c.index()]['pos']
             #computation of volume associated to the facet for mass matrix
             if problem.dim == 2:
                 vol_facet = 0.5 * np.linalg.norm(np.cross(vert[0] - bary_cell, vert[1] - bary_cell))
@@ -127,7 +127,7 @@ def connectivity_graph(problem, dirichlet_dofs):
             #number of the dof is total number of cells + num of the facet
             G.add_node(problem.nb_dof_cells // problem.d + num_global_ddl_facet[0] // problem.d, pos=bary, dof=aux, dirichlet_components=components)
             G.add_edge(aux_bis[0], problem.nb_dof_cells // problem.d + num_global_ddl_facet[0] // problem.d, num=num_global_ddl_facet[0] // problem.d, dof_CR=num_global_ddl_facet, measure=area, barycentre=bary, normal=normal, vertices=vert, pen_factor=pen_factor[num_global_ddl_facet[0] // problem.d], breakable=False)
-            G.node[aux_bis[0]]['bnd'] = True #Cell is on the boundary of the domain
+            G.nodes[aux_bis[0]]['bnd'] = True #Cell is on the boundary of the domain
                 
     return G
 

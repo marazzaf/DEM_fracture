@@ -68,9 +68,9 @@ def DEM_to_CR_matrix(problem):
 
         Y = max(x,y)
 
-        if abs(Y) >= problem.nb_dof_cells // problem.d and len(problem.Graph.node[Y]['dof']) > 0: #facet holds Dirichlet dof
-            dof = problem.Graph.node[Y]['dof']
-            dirichlet_components = problem.Graph.node[Y]['dirichlet_components']
+        if abs(Y) >= problem.nb_dof_cells // problem.d and len(problem.Graph.nodes[Y]['dof']) > 0: #facet holds Dirichlet dof
+            dof = problem.Graph.nodes[Y]['dof']
+            dirichlet_components = problem.Graph.nodes[Y]['dirichlet_components']
             count = 0
             for num,dof_CR in enumerate(num_global_ddl):
                 if num in dirichlet_components:
@@ -79,11 +79,11 @@ def DEM_to_CR_matrix(problem):
                     count += 1
                     
             for i,j in zip(convexe_f,convexe_c):
-                if 0 not in problem.Graph.node[Y]['dirichlet_components']:
+                if 0 not in problem.Graph.nodes[Y]['dirichlet_components']:
                     complete_matrix[num_global_ddl[0],i[0]] += j #because a single dof can be used twice with new symetric reconstruction
-                if problem.d >=2 and 1 not in problem.Graph.node[Y]['dirichlet_components']:
+                if problem.d >=2 and 1 not in problem.Graph.nodes[Y]['dirichlet_components']:
                     complete_matrix[num_global_ddl[1],i[1]] += j
-                if problem.d == 3 and 2 not in problem.Graph.node[Y]['dirichlet_components']:
+                if problem.d == 3 and 2 not in problem.Graph.nodes[Y]['dirichlet_components']:
                     complete_matrix[num_global_ddl[2],i[2]] += j
         else: #facet holds no Dirichlet dofs
             for i,j in zip(convexe_f,convexe_c):

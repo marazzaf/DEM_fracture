@@ -52,7 +52,7 @@ class DEMProblem:
 
         #Penalty matrix
         self.mat_pen,self.mat_jump_1,self.mat_jump_2 = penalty_term(self, nz_vec_BC)
-        self.mat_elas = self.elastic_bilinear_form(ref_elastic)
+        #self.mat_elas = self.elastic_bilinear_form(ref_elastic)
 
     def elastic_bilinear_form(self,ref_elastic):
         return  self.DEM_to_CR.T * self.mat_grad.T * ref_elastic * self.mat_grad * self.DEM_to_CR
@@ -103,7 +103,7 @@ def penalty_term(problem, nz_vec_BC):
 
             for num_cell,sign in zip([c1,c2],[1., -1.]):
                 #filling-in the DG 1 part of the jump...
-                pos_bary_cell = problem.Graph.node[num_cell]['pos']
+                pos_bary_cell = problem.Graph.nodes[num_cell]['pos']
                 diff = pos_bary_facet - pos_bary_cell
                 pen_diff = np.sqrt(coeff_pen)*diff
                 tens_dof_position = dofmap_tens_DG_0.cell_dofs(num_cell)
@@ -130,7 +130,7 @@ def penalty_term(problem, nz_vec_BC):
                     mat_jump_1[num_CR,problem.d * num_cell + pos] = coeff_pen
         
             #filling-in the DG 1 part of the jump
-            pos_bary_cell = problem.Graph.node[num_cell]['pos']
+            pos_bary_cell = problem.Graph.nodes[num_cell]['pos']
             diff = pos_bary_facet - pos_bary_cell
             pen_diff = coeff_pen*diff
             tens_dof_position = dofmap_tens_DG_0.cell_dofs(num_cell)
@@ -140,7 +140,7 @@ def penalty_term(problem, nz_vec_BC):
                         mat_jump_2[dof_CR,tens_dof_position[num*problem.d + i]] = pen_diff[i]
 
             #boundary facet part
-            dof = problem.Graph.node[other]['dof']
+            dof = problem.Graph.nodes[other]['dof']
             count = 0
             for num_CR in num_global_ddl:
                 if num_CR in nz_vec_BC:
@@ -172,7 +172,7 @@ def removing_penalty(problem, cracking_facets):
 
         for num_cell,sign in zip([c1,c2],[1., -1.]):
             #filling-in the DG 1 part of the jump...
-            pos_bary_cell = problem.Graph.node[num_cell]['pos']
+            pos_bary_cell = problem.Graph.nodes[num_cell]['pos']
             diff = pos_bary_facet - pos_bary_cell
             pen_diff = np.sqrt(coeff_pen)*diff
             tens_dof_position = dofmap_tens_DG_0.cell_dofs(num_cell)

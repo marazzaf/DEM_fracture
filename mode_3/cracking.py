@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse.linalg import cg
 from DEM_cracking.DEM import *
 from DEM_cracking.miscellaneous import *
+from DEM_cracking.cracking import *
 
 # Form compiler options
 parameters["form_compiler"]["cpp_optimize"] = True
@@ -121,10 +122,11 @@ for (x,y) in problem.Graph.edges():
         cells_with_cracked_facet |= {x,y}
         #cells_to_test |= set(facet_num.get(f)) #verifying only one facet per cell breaks
 
-sys.exit()
 
 #adapting after crack
-passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)
+#passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)
+adapting_after_crack(problem, cracking_facets, cracked_facets) #Get problem as an output or make it a method of the class ?
+sys.exit()
 out_cracked_facets(folder, size_ref, 0, cracked_facet_vertices, dim) #paraview cracked facet file
 cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
 mat_elas = elastic_term(mat_grad, passage_ccG_to_CR)

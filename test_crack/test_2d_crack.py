@@ -55,19 +55,10 @@ v_CR = TestFunction(U_CR)
 
 #new for BC
 l4 = v_CR('+')[1] / hF * (ds(41) + ds(42))
-#l4 = inner(v_CR('+'), as_vector((1.,1.))) / hF * ds
-#l4 = inner(v_CR('+'), as_vector((1.,1.))) / hF * (ds(41)+ds(42))
 L4 = assemble(l4)
 vec_BC = L4.get_local()
 nz_vec_BC = list(vec_BC.nonzero()[0])
 nz_vec_BC = set(nz_vec_BC)
-
-#bc = DirichletBC(U_CR, Constant((0,0)), traction_boundary_2)
-#print(bc)
-#print(bc.function_space())
-#bc_2 = DirichletBC(FunctionSpace(bc.function_space()), UserExpression(bc.value()), traction_boundary_2)
-#print(bc.value())
-#sys.exit()
 
 #Creating the DEM problem
 problem = DEMProblem(mesh, 2, penalty, nz_vec_BC, mu, lambda_)
@@ -80,7 +71,6 @@ def sigma(eps_el):
 
 #Variational problem
 ref_elastic = ref_elastic_bilinear_form(problem, sigma, eps)
-mat_elas = problem.elastic_bilinear_form(ref_elastic)
 
 #Stresses output
 problem.mat_stress = output_stress(problem, sigma, eps)
@@ -97,8 +87,39 @@ u_D = Expression(('0.', 'x[1]/fabs(x[1]) * disp'), disp = Delta_u,degree=1)
 #paraview outputs
 file = File('test.pvd')
 
+count_output_crack = 1
+cracked_facet_vertices = []
+cracking_facets = set()
+cracked_facets = set()
+
+#before the computation begins, we break the facets to have a crack of length 1
+for (x,y) in problem.Graph.edges():
+    f = problem.Graph[x][y]['dof_CR'][0] // problem.d
+    pos = problem.Graph[x][y]['barycentre']
+    if problem.Graph[x][y]['breakable'] and abs(pos[1]) < 1.e-15 and pos[0] < l0:
+        cracking_facets.add(f)
+        cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
+
+print(cracking_facets)
+sys.exit()
+
+#adapting after crack
+mat_jump_1_aux,mat_jump_2_aux = problem.removing_penalty(cracking_facets)
+problem.mat_jump_1 -= mat_jump_1_aux
+problem.mat_jump_2 -= mat_jump_2_aux
+problem.adapting_after_crack(cracking_facets, cracked_facets)
+folder='./'
+out_cracked_facets(folder, size_ref, 0, cracked_facet_vertices, problem.dim) #paraview cracked facet file
+cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
+mat_elas = problem.elastic_bilinear_form(ref_elastic)
+problem.mat_jump_1.resize((problem.nb_dof_CR,problem.nb_dof_DEM))
+problem.mat_jump_2.resize((problem.nb_dof_CR,problem.nb_dof_grad))
+problem.mat_jump = problem.mat_jump_1 + problem.mat_jump_2 * problem.mat_grad * problem.DEM_to_CR
+mat_pen = problem.mat_jump.T * problem.mat_jump
+A = mat_elas + mat_pen
+
 #lhs
-A = mat_elas + problem.mat_pen
+A = mat_elas + mat_pen
 
 #Removing Dirichlet BC
 A_not_D = problem.mat_not_D * A * problem.mat_not_D.T

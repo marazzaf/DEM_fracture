@@ -208,32 +208,32 @@ def local_gradient_matrix(num_cell, problem):
         res[:, dofs[0] : dofs[problem.d-1] + 1] = aux #importation dans la matrice locale de la cellule
     return res
 
-def removing_penalty(problem, cracking_facets):
-    dofmap_tens_DG_0 = problem.W.dofmap()
+def removing_penalty(self, cracking_facets):
+    dofmap_tens_DG_0 = self.W.dofmap()
     
     #creating jump matrix
-    mat_jump_1 = dok_matrix((problem.nb_dof_CR,problem.nb_dof_DEM))
-    mat_jump_2 = dok_matrix((problem.nb_dof_CR,problem.nb_dof_grad))
+    mat_jump_1 = dok_matrix((self.nb_dof_CR,self.nb_dof_DEM))
+    mat_jump_2 = dok_matrix((self.nb_dof_CR,self.nb_dof_grad))
 
     for f in cracking_facets: #utiliser facet_num pour avoir les voisins ?
-        assert len(problem.facet_num.get(f)) == 2 
-        c1,c2 = problem.facet_num.get(f) #must be two otherwise external facet broke
-        num_global_ddl = problem.Graph[c1][c2]['dof_CR']
-        coeff_pen = problem.Graph[c1][c2]['pen_factor']
-        pos_bary_facet = problem.Graph[c1][c2]['barycentre'] #position barycentre of facet
+        assert len(self.facet_num.get(f)) == 2 
+        c1,c2 = self.facet_num.get(f) #must be two otherwise external facet broke
+        num_global_ddl = self.Graph[c1][c2]['dof_CR']
+        coeff_pen = self.Graph[c1][c2]['pen_factor']
+        pos_bary_facet = self.Graph[c1][c2]['barycentre'] #position barycentre of facet
         #filling-in the DG 0 part of the jump
-        mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,problem.d * c1 : (c1+1) * problem.d] = np.sqrt(coeff_pen)*np.eye(problem.d)
-        mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,problem.d * c2 : (c2+1) * problem.d] = -np.sqrt(coeff_pen)*np.eye(problem.d)
+        mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,self.d * c1 : (c1+1) * self.d] = np.sqrt(coeff_pen)*np.eye(self.d)
+        mat_jump_1[num_global_ddl[0]:num_global_ddl[-1]+1,self.d * c2 : (c2+1) * self.d] = -np.sqrt(coeff_pen)*np.eye(self.d)
 
         for num_cell,sign in zip([c1,c2],[1., -1.]):
             #filling-in the DG 1 part of the jump...
-            pos_bary_cell = problem.Graph.nodes[num_cell]['pos']
+            pos_bary_cell = self.Graph.nodes[num_cell]['pos']
             diff = pos_bary_facet - pos_bary_cell
             pen_diff = np.sqrt(coeff_pen)*diff
             tens_dof_position = dofmap_tens_DG_0.cell_dofs(num_cell)
             for num,dof_CR in enumerate(num_global_ddl):
-                for i in range(problem.dim):
-                    mat_jump_2[dof_CR,tens_dof_position[(num % problem.d)*problem.d + i]] = sign*pen_diff[i]
+                for i in range(self.dim):
+                    mat_jump_2[dof_CR,tens_dof_position[(num % self.d)*self.d + i]] = sign*pen_diff[i]
 
     return mat_jump_1.tocsr(), mat_jump_2.tocsr()
 

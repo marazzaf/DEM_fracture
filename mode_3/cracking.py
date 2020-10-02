@@ -84,7 +84,6 @@ def sigma(eps_el):
 #Variational problem
 ref_elastic = ref_elastic_bilinear_form(problem, sigma, eps)
 mat_elas = problem.elastic_bilinear_form(ref_elastic)
-mat_pen = problem.mat_pen
 
 #Stresses output
 problem.mat_stress = output_stress(problem, sigma, eps)
@@ -124,13 +123,17 @@ for (x,y) in problem.Graph.edges():
 
 
 #adapting after crack
-#passage_ccG_to_CR, mat_grad, nb_ddl_CR, facet_num, mat_D, mat_not_D = adapting_after_crack(cracking_facets, cracked_facets, d, dim, facet_num, nb_ddl_cells, nb_ddl_ccG, nb_ddl_CR, passage_ccG_to_CR, mat_grad, G, mat_D, mat_not_D)
+mat_jump_1_aux,mat_jump_2_aux = removing_penalty(problem, cracking_facets)
+problem.mat_jump_1 -= mat_jump_1_aux
+problem.mat_jump_2 -= mat_jump_2_aux
 adapting_after_crack(problem, cracking_facets, cracked_facets) #Get problem as an output or make it a method of the class ?
-sys.exit()
-out_cracked_facets(folder, size_ref, 0, cracked_facet_vertices, dim) #paraview cracked facet file
+out_cracked_facets(folder, size_ref, 0, cracked_facet_vertices, problem.dim) #paraview cracked facet file
 cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
-mat_elas = elastic_term(mat_grad, passage_ccG_to_CR)
-mat_pen,mat_jump_1,mat_jump_2 = penalty_term(nb_ddl_ccG, mesh, d, dim, mat_grad, passage_ccG_to_CR, G, nb_ddl_CR, nz_vec_BC)
+mat_elas = problem.elastic_bilinear_form(ref_elastic)
+problem.mat_jump_1.resize((problem.nb_dof_CR,problem.nb_dof_DEM))
+problem.mat_jump_2.resize((problem.nb_dof_CR,problem.nb_dof_grad))
+problem.mat_jump = problem.mat_jump_1 + problem.mat_jump_2 * problem.mat_grad * problem.DEM_to_CR
+mat_pen = problem.mat_jump.T * problem.mat_jump
 A = mat_elas + mat_pen
 L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
 
@@ -142,7 +145,7 @@ L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
 #Updating facets that cannot be broken because they belong to a cell with an already broken facet
 not_breakable_facets |= cracked_facets #already broken facets cannot break again
 for c in cells_with_cracked_facet:
-    not_breakable_facets |= facets_cell.get(c)
+    not_breakable_facets |= problem.facets_cell.get(c)
 
 #Imposing strongly Dirichlet BC
 A_D = mat_D * A * mat_D.T
@@ -164,7 +167,7 @@ while u_D.t < T:
 
     #interpolation of Dirichlet BC
     FF = interpolate(u_D, U_CR).vector().get_local()
-    F = mat_D * trace_matrix.T * FF
+    F = mat_D * problem.trace_matrix.T * FF
 
     #taking into account exterior loads
     #L_not_D = mat_not_D * matrice_trace_bord.T * L
@@ -180,23 +183,23 @@ while u_D.t < T:
         u = mat_not_D.T * u_reduced + mat_D.T * F
 
         #Post-processing
-        vec_u_CR = passage_ccG_to_CR * u
-        vec_u_DG = passage_ccG_to_DG * u
+        vec_u_CR = problem.DEM_to_CR * u
+        vec_u_DG = problem.DEM_to_DG * u
         #facet_stresses = average_stresses * mat_grad * vec_u_CR
-        stresses = mat_stress * mat_grad * vec_u_CR
-        stress_per_cell = stresses.reshape((nb_ddl_cells // d,dim))
+        stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
+        stress_per_cell = stresses.reshape((problem.nb_dof_cells // problem.d,problem.dim))
         #strain = mat_strain * mat_grad * vec_u_CR
         #strain_per_cell = strain.reshape((nb_ddl_cells // d,dim))
 
         ##sorties paraview
         #if u_D.t % (T / 10) < dt:
-        #solution_u_DG.vector().set_local(vec_u_DG)
-        #solution_u_DG.vector().apply("insert")
-        #file.write(solution_u_DG, u_D.t)
-        #solution_stress.vector().set_local(mat_stress * mat_grad * vec_u_CR)
-        #solution_stress.vector().apply("insert")
-        #file.write(solution_stress, u_D.t)
-        #sys.exit()
+        solution_u_DG.vector().set_local(vec_u_DG)
+        solution_u_DG.vector().apply("insert")
+        file.write(solution_u_DG, u_D.t)
+        solution_stress.vector().set_local(problem.mat_stress * problem.mat_grad * vec_u_CR)
+        solution_stress.vector().apply("insert")
+        file.write(solution_stress, u_D.t)
+        sys.exit()
 
         cracking_facets = set()
         ##Computing breaking facets

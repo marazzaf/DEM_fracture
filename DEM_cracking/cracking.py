@@ -215,7 +215,7 @@ def removing_penalty(problem, cracking_facets):
     
     #creating jump matrix
     mat_jump_1 = dok_matrix((problem.nb_dof_CR,problem.nb_dof_DEM))
-    mat_jump_2 = dok_matrix((problem.nb_dof_CR_,problem.nb_dof_grad))
+    mat_jump_2 = dok_matrix((problem.nb_dof_CR,problem.nb_dof_grad))
 
     for f in cracking_facets: #utiliser facet_num pour avoir les voisins ?
         assert len(problem.facet_num.get(f)) == 2 
@@ -234,7 +234,7 @@ def removing_penalty(problem, cracking_facets):
             pen_diff = np.sqrt(coeff_pen)*diff
             tens_dof_position = dofmap_tens_DG_0.cell_dofs(num_cell)
             for num,dof_CR in enumerate(num_global_ddl):
-                for i in range(dim_):
+                for i in range(problem.dim):
                     mat_jump_2[dof_CR,tens_dof_position[(num % problem.d)*problem.d + i]] = sign*pen_diff[i]
 
     return mat_jump_1.tocsr(), mat_jump_2.tocsr()

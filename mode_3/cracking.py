@@ -193,7 +193,7 @@ while u_D.t < T:
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh)[idx])]
 
-        #Chossing which facet to break
+        #Choosing which facet to break
         for f in indices:
             if Gh[f] > Gc:
                 cracking_facets = {f}
@@ -228,7 +228,7 @@ while u_D.t < T:
             problem.update_penalty_matrix()
             problem.elastic_bilinear_form(ref_elastic)
             A = problem.mat_elas + problem.mat_pen
-            L = np.concatenate((L, np.zeros(d * len(cracking_facets))))
+            L = np.concatenate((L, np.zeros(problem.d * len(cracking_facets))))
 
             #Crack output
             count_output_crack +=1

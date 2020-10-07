@@ -274,9 +274,9 @@ def energy_release_rates(self, vec_u_CR, cracked_facets, not_breakable_facets):
                 G2 *= np.pi / self.mu * dist_2
             else:
                 G1 = np.dot(stress_1,stress_1)
-                G1 *= np.pi / self.E * dist_1
+                G1 *= np.pi / float(self.E) * dist_1
                 G2 = np.dot(stress_2,stress_2)
-                G2 *= np.pi / self.E * dist_2
+                G2 *= np.pi / float(self.E) * dist_2
 
             Gh[f] = np.sqrt(G1*G2) #looks all right...
                 

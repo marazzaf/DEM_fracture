@@ -247,7 +247,7 @@ def update_penalty_matrix(self):
     self.mat_pen = self.mat_jump.T * self.mat_jump
     return
 
-def energy_release_rates(self, vec_u_CR, cracked_facets, not_breakable_facets):
+def energy_release_rates(self, vec_u_CR, cracked_facets, not_breakable_facets=set()):
     cracking_facets = set()
     stresses = self.mat_stress * self.mat_grad * vec_u_CR
     if self.d == 1:

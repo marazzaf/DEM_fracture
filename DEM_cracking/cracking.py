@@ -263,15 +263,17 @@ def energy_release_rates(self, vec_u_CR, cracked_facets, not_breakable_facets=se
                 c1,c2 = self.facet_num.get(f)
                 c1p = self.facet_num.get(fp)[0]
                 normal = self.Graph[c1p][self.nb_dof_cells // self.d + fp]['normal']
-                dist_1 = np.linalg.norm(self.Graph.nodes[c1]['pos'] - self.Graph[c1p][self.nb_dof_cells // self.d + fp]['barycentre'])
-                dist_2 = np.linalg.norm(self.Graph.nodes[c2]['pos'] - self.Graph[c1p][self.nb_dof_cells // self.d + fp]['barycentre'])
+                vertices_facet = self.Graph[c1p][self.nb_dof_cells // self.d + fp]['vertices']
+                dist_1 = min(np.linalg.norm(self.Graph.nodes[c1]['pos'] - vertices_facet[0]), np.linalg.norm(self.Graph.nodes[c1]['pos'] - vertices_facet[1]))
+                #dist_2 = np.linalg.norm(self.Graph.nodes[c2]['pos'] - self.Graph[c1p][self.nb_dof_cells // self.d + fp]['barycentre'])
+                dist_2 = min(np.linalg.norm(self.Graph.nodes[c2]['pos'] - vertices_facet[0]), np.linalg.norm(self.Graph.nodes[c2]['pos'] - vertices_facet[1]))
                 stress_1 = np.dot(stress_per_cell[c1],normal)
                 stress_2 = np.dot(stress_per_cell[c2],normal)
             if self.d == 1:
                 G1 = stress_1 * stress_1
-                G1 *= np.pi / self.mu * dist_1 * 0.5 #test
+                G1 *= 2*np.pi / self.mu * dist_1
                 G2 = stress_2 * stress_2
-                G2 *= np.pi / self.mu * dist_2 * 0.5 #test
+                G2 *= 2*np.pi / self.mu * dist_2
             else:
                 G1 = np.dot(stress_1,stress_1)
                 G1 *= np.pi / float(self.E) * dist_1

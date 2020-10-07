@@ -22,7 +22,7 @@ size_ref = 20 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
-#print(h)
+print(h)
 
 # Sub domain for BC
 def upper_left(x, on_boundary):
@@ -86,9 +86,9 @@ areas = assemble(f_CR('+') * (dS + ds)).get_local() #For crack speeds
 
 #length crack output
 #length_crack = open('h_0_05/length_crack_%i.txt' % size_ref, 'w')
-#length_crack = open('h_0_05/chi_%i.txt' % 3, 'w')
-length_crack = open('constant_chi/h_%i.txt' % 25, 'w')
-folder = 'constant_chi'
+length_crack = open('h_0_05/chi_%i.txt' % 4, 'w')
+#length_crack = open('constant_chi/length_crack_%i.txt' % size_ref, 'w')
+folder = 'h_0_05'
 
 count_output_crack = 0
 cracked_facet_vertices = []
@@ -129,7 +129,7 @@ A_not_D,B = problem.schur_complement(A)
 #definition of time-stepping parameters
 T = 1. / k
 u_D.t = 0.2 / k #il ne se passe rien avant...
-chi = 4.5 #450 #45 #4.5 #0.45
+chi = 0.45 #450 #45 #4.5 #0.45
 dt = h / (chi*k)
 #dt = 5.6e-3 / k
 #chi = h / 5.6e-3

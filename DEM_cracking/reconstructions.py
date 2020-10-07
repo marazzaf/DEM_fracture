@@ -10,46 +10,37 @@ def DEM_to_DG_matrix(problem):
 
     return sp.eye(problem.nb_dof_cells, n = problem.nb_dof_DEM, format='csr')
 
-def matrice_passage_ccG_DG_1(mesh_, nb_ddl_ccG_, d_, dim_, mat_grad_, passage_ccG_CR):
-    if d_ == 1:
-        EDG_0 = FunctionSpace(mesh_, 'DG', 0)
-        EDG_1 = FunctionSpace(mesh_, 'DG', 1)
-        tens_DG_0 = VectorFunctionSpace(mesh_, 'DG', 0)
-    else:
-        EDG_0 = VectorFunctionSpace(mesh_, 'DG', 0)
-        EDG_1 = VectorFunctionSpace(mesh_, 'DG', 1)
-        tens_DG_0 = TensorFunctionSpace(mesh_, 'DG', 0)
-    dofmap_DG_0 = EDG_0.dofmap()
-    dofmap_DG_1 = EDG_1.dofmap()
-    dofmap_tens_DG_0 = tens_DG_0.dofmap()
-    elt_0 = EDG_0.element()
-    elt_1 = EDG_1.element()
-    nb_total_dof_DG_1 = len(dofmap_DG_1.dofs())
-    nb_ddl_grad = len(dofmap_tens_DG_0.dofs())
-    matrice_resultat_1 = sp.dok_matrix((nb_total_dof_DG_1,nb_ddl_ccG_)) #Matrice vide.
-    matrice_resultat_2 = sp.dok_matrix((nb_total_dof_DG_1,nb_ddl_grad)) #Matrice vide.
+def DEM_to_DG_1_matrix(problem):
+    dofmap_DG_0 = problem.DG_0.dofmap()
+    dofmap_tens_DG_0 = problem.W.dofmap()
+    elt_1 = problem.DG_1.element()
+    dofmap_DG_1 = problem.DG_1.dofmap()
+    nb_total_dof_DG_1 = dofmap_DG_1.global_dimension()
     
-    for c in cells(mesh_):
+    matrice_resultat_1 = sp.dok_matrix((nb_total_dof_DG_1,problem.nb_dof_DEM)) #Matrice vide.
+    matrice_resultat_2 = sp.dok_matrix((nb_total_dof_DG_1,problem.nb_dof_grad)) #Matrice vide.
+    
+    for c in cells(problem.mesh):
         index_cell = c.index()
         dof_position = dofmap_DG_1.cell_dofs(index_cell)
 
         #filling-in the matrix to have the constant cell value
         DG_0_dofs = dofmap_DG_0.cell_dofs(index_cell)
         for dof in dof_position:
-            matrice_resultat_1[dof, DG_0_dofs[dof % d_]] = 1.
+            matrice_resultat_1[dof, DG_0_dofs[dof % problem.d]] = 1.
 
         #filling-in part to add the gradient term
-        position_barycentre = elt_0.tabulate_dof_coordinates(c)[0]
+        position_barycentre = problem.Graph.nodes[index_cell]['pos']
         pos_dof_DG_1 = elt_1.tabulate_dof_coordinates(c)
         tens_dof_position = dofmap_tens_DG_0.cell_dofs(index_cell)
         for dof,pos in zip(dof_position,pos_dof_DG_1): #loop on quadrature points
             diff = pos - position_barycentre
-            for i in range(dim_):
-                matrice_resultat_2[dof, tens_dof_position[(dof % d_)*d_ + i]] = diff[i]
+            for i in range(problem.dim):
+                matrice_resultat_2[dof, tens_dof_position[(dof % problem.d)*problem.d + i]] = diff[i]
 
     matrice_resultat_1 = matrice_resultat_1.tocsr()
     matrice_resultat_2 = matrice_resultat_2.tocsr()
-    return (matrice_resultat_1 +  matrice_resultat_2 * mat_grad_ * passage_ccG_CR), matrice_resultat_1, matrice_resultat_2
+    return (matrice_resultat_1 +  matrice_resultat_2 * problem.mat_grad * problem.DEM_to_CR), matrice_resultat_1, matrice_resultat_2
 
 
 def DEM_to_CR_matrix(problem):

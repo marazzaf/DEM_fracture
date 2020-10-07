@@ -8,6 +8,7 @@ def adapting_after_crack(self, cracking_facets, already_cracked_facets):
     impacted_facets = self.adapting_graph(cracking_facets)
     self.adapting_facet_reconstruction(cracking_facets, already_cracked_facets, impacted_facets)
     self.adapting_grad_matrix(cracking_facets)
+    self.DEM_to_DG_1 = self.aux_DG_1_1 + self.aux_DG_1_2 * self.mat_grad * self.DEM_to_CR
     return
 
 def adapting_graph(self, cracking_facets):

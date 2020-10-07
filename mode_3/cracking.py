@@ -18,18 +18,18 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-folder = 'structured'
-size_ref = 5 #40 #20 #10
-mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
+#folder = 'structured'
+#size_ref = 5 #40 #20 #10
+#mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 #folder = 'no_initial_crack'
-#folder = 'unstructured'
+folder = 'unstructured'
 #h = H / size_ref
 #size_ref = 3
 #mesh = Mesh('mesh/test.xml') #3
 #size_ref = 2
 #mesh = Mesh('mesh/cracked_plate_fine.xml')
-#size_ref = 1
-#mesh = Mesh('mesh/cracked_plate_coarse.xml')
+size_ref = 1
+mesh = Mesh('mesh/cracked_plate_coarse.xml')
 h = mesh.hmax()
 #print(h)
 
@@ -102,7 +102,7 @@ file = File('%s/anti_plane_%i_.pvd' % (folder,size_ref))
 count_output_crack = 1
 cracked_facet_vertices = []
 cracked_facets = set()
-length_cracked_facets = 0.
+#length_cracked_facets = 0.
 cells_with_cracked_facet = set()
 not_breakable_facets = set()
 

@@ -4,7 +4,6 @@ from scipy.sparse import csr_matrix,dok_matrix
 import numpy as np
 from DEM_cracking.mesh_related import *
 from DEM_cracking.reconstructions import *
-#from DEM_cracking.facet_interpolation import *
 from DEM_cracking.miscellaneous import *
 
 class DEMProblem:
@@ -53,6 +52,7 @@ class DEMProblem:
         #DEM reconstructions
         self.DEM_to_DG = DEM_to_DG_matrix(self)
         self.DEM_to_CR,self.trace_matrix = DEM_to_CR_matrix(self)
+        self.DEM_to_DG_1,self.aux_DG_1_1,self.aux_DG_1_2 = DEM_to_DG_1_matrix(self)
         print('Reconstruction matrices ok!')
 
         #Penalty matrix

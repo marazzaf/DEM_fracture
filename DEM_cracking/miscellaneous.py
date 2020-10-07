@@ -95,4 +95,4 @@ def output_stress(problem, sigma=grad, eps=grad):
     return mat_stress
 
 def complete_solution(self, u_reduced, u_D):
-    return self.mat_not_D.T * u_reduced + self.trace_matrix.T * np.nan_to_num(interpolate(u_D, self.CR).vector().get_local())
+    return self.mat_not_D.T * u_reduced + self.trace_matrix.T * local_project(u_D, self.CR).vector().get_local()

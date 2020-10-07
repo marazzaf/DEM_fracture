@@ -18,7 +18,7 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 20 #80 #40 #20 #10
+size_ref = 10 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -86,9 +86,9 @@ areas = assemble(f_CR('+') * (dS + ds)).get_local() #For crack speeds
 
 #length crack output
 #length_crack = open('h_0_05/length_crack_%i.txt' % size_ref, 'w')
-length_crack = open('test/chi_%i.txt' % 1, 'w')
-#length_crack = open('constant_chi/length_crack_%i.txt' % size_ref, 'w')
-folder = 'h_0_05'
+#length_crack = open('test/chi_%i.txt' % 1, 'w')
+folder = 'constant_chi_10'
+length_crack = open(folder+'/length_crack_%i.txt' % size_ref, 'w')
 
 count_output_crack = 0
 cracked_facet_vertices = []
@@ -104,6 +104,7 @@ for (x,y) in problem.Graph.edges():
     if problem.Graph[x][y]['breakable'] and abs(pos[1]) < 1.e-15 and pos[0] < l0:
         cracking_facets.add(f)
         cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
+        length_cracked_facets += areas[f]
         if pos[0] > l0 - h:
             closest = f
 #adapting after crack
@@ -128,8 +129,8 @@ A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 T = 1. / k
-u_D.t = 0.2 / k #il ne se passe rien avant...
-chi = 450 #450 #45 #4.5 #0.45
+u_D.t = 0.1 / k #il ne se passe rien avant...
+chi = 10 #450 #45 #4.5 #0.45
 dt = h / (chi*k)
 #dt = 5.6e-3 / k
 #chi = h / 5.6e-3

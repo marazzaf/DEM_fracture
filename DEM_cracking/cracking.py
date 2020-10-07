@@ -269,9 +269,9 @@ def energy_release_rates(self, vec_u_CR, cracked_facets, not_breakable_facets=se
                 stress_2 = np.dot(stress_per_cell[c2],normal)
             if self.d == 1:
                 G1 = stress_1 * stress_1
-                G1 *= np.pi / self.mu * dist_1
+                G1 *= np.pi / self.mu * dist_1 * 0.5 #test
                 G2 = stress_2 * stress_2
-                G2 *= np.pi / self.mu * dist_2
+                G2 *= np.pi / self.mu * dist_2 * 0.5 #test
             else:
                 G1 = np.dot(stress_1,stress_1)
                 G1 *= np.pi / float(self.E) * dist_1

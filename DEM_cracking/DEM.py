@@ -62,7 +62,7 @@ class DEMProblem:
         self.mat_not_D,self.mat_D = schur_matrices(self)
 
     #Importing methods
-    from DEM_cracking.cracking import adapting_graph,adapting_after_crack,adapting_facet_reconstruction,adapting_grad_matrix,energy_release_rates,removing_penalty,update_penalty_matrix
+    from DEM_cracking.cracking import adapting_graph,adapting_after_crack,adapting_facet_reconstruction,adapting_grad_matrix,energy_release_rates,removing_penalty,update_penalty_matrix,energy_release_rates_bis
     from DEM_cracking.miscellaneous import schur_matrices,DEM_interpolation,complete_solution,schur_complement
 
     def elastic_bilinear_form(self,ref_elastic):

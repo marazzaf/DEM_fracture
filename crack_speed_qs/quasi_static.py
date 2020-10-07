@@ -129,7 +129,7 @@ A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 T = 1. / k
-u_D.t = 0.1 / k #il ne se passe rien avant...
+u_D.t = 0.24 / k #il ne se passe rien avant...
 chi = 10 #450 #45 #4.5 #0.45
 dt = h / (chi*k)
 #dt = 5.6e-3 / k
@@ -168,7 +168,12 @@ while u_D.t < T:
         cracking_facets = set()
         
         #Computing new Gh
-        Gh = problem.energy_release_rates(vec_u_CR, cracked_facets)
+        #Gh = problem.energy_release_rates(vec_u_CR, cracked_facets)
+        #Gh_bis = problem.energy_release_rates_bis(vec_u_CR, vec_u_DG)
+        #print(max(Gh),max(Gh_bis))
+        #print(max(Gh)/max(Gh_bis))
+        #Just for a test
+        Gh = problem.energy_release_rates_bis(vec_u_CR, vec_u_DG)
 
         #Finding which facet to break
         c1 = problem.facet_num.get(closest)[0]

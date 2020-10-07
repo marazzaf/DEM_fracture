@@ -1,4 +1,6 @@
 #coding: utf-8
+from dolfin import *
+from scipy.sparse import csr_matrix
 import numpy as np
 from DEM_cracking.facet_reconstruction import bary_coord
 from scipy.sparse import lil_matrix,dok_matrix
@@ -271,9 +273,9 @@ def energy_release_rates(self, vec_u_CR, cracked_facets, not_breakable_facets=se
                 stress_2 = np.dot(stress_per_cell[c2],normal)
             if self.d == 1:
                 G1 = stress_1 * stress_1
-                G1 *= 2*np.pi / self.mu * dist_1
+                G1 *= np.pi / self.mu * dist_1 #*2
                 G2 = stress_2 * stress_2
-                G2 *= 2*np.pi / self.mu * dist_2
+                G2 *= np.pi / self.mu * dist_2 #*2
             else:
                 G1 = np.dot(stress_1,stress_1)
                 G1 *= np.pi / float(self.E) * dist_1
@@ -283,3 +285,32 @@ def energy_release_rates(self, vec_u_CR, cracked_facets, not_breakable_facets=se
             Gh[f] = np.sqrt(G1*G2) #looks all right...
                 
     return Gh
+
+def energy_release_rates_bis(self, vec_u_CR, vec_u_DG):
+    n = FacetNormal(self.mesh)
+    S = FacetArea(self.mesh)
+    u_CR = TrialFunction(self.CR)
+    Dv_DG = TestFunction(self.W)
+
+    #To get normal stress
+    a = inner(dot(avg(Dv_DG),n('+')), u_CR('+')) / S('+') * dS
+    A = assemble(a)
+    row,col,val = as_backend_type(A).mat().getValuesCSR()
+    A = csr_matrix((val, col, row))
+
+    normal_stresses = A.T * self.mat_stress * self.mat_grad * vec_u_CR
+    #normal_stresses = normal_stresses.reshape((self.initial_nb_dof_CR // self.d, self.dim))
+
+    #To get facet jumps
+    v_DG = TestFunction(self.DG_0)
+    a = inner(jump(v_DG), u_CR('+')) / S('+') * dS
+    A = assemble(a)
+    row,col,val = as_backend_type(A).mat().getValuesCSR()
+    A = csr_matrix((val, col, row))
+
+    jumps = A.T * vec_u_DG
+    #jumps = jumps.reshape((self.initial_nb_dof_CR // self.d, self.dim))
+
+    #Assembling
+    return np.pi * abs(normal_stresses * jumps)
+    #return 0.5 * sum(normal_stresses * jumps, axis=0)

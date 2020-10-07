@@ -19,7 +19,7 @@ penalty = mu
 
 #geometry
 a, R, l0 = 0.5, 0.025, 0.025
-size_ref = 1
+size_ref = 5
 #mesh = Mesh("mesh_old/circle_%i.xml" % size_ref) #maillage domaine circulaire
 #bnd_facets = MeshFunction("size_t", mesh, 'mesh_old/circle_%i_facet_region.xml' % size_ref)
 #bnd_facets = MeshFunction("size_t", mesh, 1)
@@ -140,6 +140,7 @@ u_ref_ccG = problem.DEM_interpolation(u_sing)
 diff = u - u_ref_ccG
 err_energy = np.dot(diff, A * diff)
 err_energy = np.sqrt(0.5 * err_energy)
+print(problem.nb_dof_DEM)
 print('error energy: %.5e' % err_energy)
 
 #L2 error

@@ -18,7 +18,7 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 10 #80 #40 #20 #10
+size_ref = 20 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -87,7 +87,7 @@ areas = assemble(f_CR('+') * (dS + ds)).get_local() #For crack speeds
 #length crack output
 #length_crack = open('h_0_05/length_crack_%i.txt' % size_ref, 'w')
 #length_crack = open('test/chi_%i.txt' % 1, 'w')
-folder = 'constant_chi_10'
+folder = 'constant_chi_4_5'
 length_crack = open(folder+'/length_crack_%i.txt' % size_ref, 'w')
 
 count_output_crack = 0
@@ -130,7 +130,7 @@ A_not_D,B = problem.schur_complement(A)
 #definition of time-stepping parameters
 T = 1. / k
 u_D.t = 0.24 / k #il ne se passe rien avant...
-chi = 10 #450 #45 #4.5 #0.45
+chi = 4.5 #450 #45 #4.5 #0.45
 dt = h / (chi*k)
 #dt = 5.6e-3 / k
 #chi = h / 5.6e-3

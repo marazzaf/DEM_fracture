@@ -18,7 +18,7 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 10 #80 #40 #20 #10
+size_ref = 20 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -86,9 +86,9 @@ areas = assemble(f_CR('+') * (dS + ds)).get_local() #For crack speeds
 
 #length crack output
 #length_crack = open('h_0_05/length_crack_%i.txt' % size_ref, 'w')
-length_crack = open('test/chi_%i.txt' % 4, 'w')
+length_crack = open('test/chi_%i.txt' % 1, 'w')
 #length_crack = open('constant_chi/length_crack_%i.txt' % size_ref, 'w')
-folder = 'test'
+folder = 'h_0_05'
 
 count_output_crack = 0
 cracked_facet_vertices = []

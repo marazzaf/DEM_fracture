@@ -18,7 +18,7 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 20 #80 #40 #20 #10
+size_ref = 10 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -86,9 +86,9 @@ areas = assemble(f_CR('+') * (dS + ds)).get_local() #For crack speeds
 
 #length crack output
 #length_crack = open('h_0_05/length_crack_%i.txt' % size_ref, 'w')
-length_crack = open('h_0_05/chi_%i.txt' % 4, 'w')
+length_crack = open('test/chi_%i.txt' % 4, 'w')
 #length_crack = open('constant_chi/length_crack_%i.txt' % size_ref, 'w')
-folder = 'h_0_05'
+folder = 'test'
 
 count_output_crack = 0
 cracked_facet_vertices = []
@@ -129,7 +129,7 @@ A_not_D,B = problem.schur_complement(A)
 #definition of time-stepping parameters
 T = 1. / k
 u_D.t = 0.2 / k #il ne se passe rien avant...
-chi = 0.45 #450 #45 #4.5 #0.45
+chi = 450 #450 #45 #4.5 #0.45
 dt = h / (chi*k)
 #dt = 5.6e-3 / k
 #chi = h / 5.6e-3
@@ -176,12 +176,13 @@ while u_D.t < T:
             if len(problem.facet_num.get(f)) == 2:
                 n1,n2 = problem.facet_num.get(f)
                 pos = problem.Graph[n1][n2]['barycentre']
-                if pos[0] > pos_closest and np.absolute(pos[1]) < 1.e-15 and Gh[f] > Gc:
-                    cracking_facets = {f}
-                    closest = f#Update closest
-                    break
-                else:
-                    inverting = False
+                if pos[0] > pos_closest and np.absolute(pos[1]) < 1.e-15:
+                    if Gh[f] > Gc:
+                        cracking_facets = {f}
+                        closest = f #Update closest
+                        break
+                    else:
+                        inverting = False
 
             #get correspondance between dof
         for f in cracking_facets:

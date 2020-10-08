@@ -18,18 +18,18 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-#folder = 'structured'
-#size_ref = 5 #40 #20 #10
-#mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
+folder = 'test_structured'
+size_ref = 5 #40 #20 #10
+mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 #folder = 'no_initial_crack'
-folder = 'unstructured'
+#folder = 'unstructured'
 #h = H / size_ref
 #size_ref = 3
 #mesh = Mesh('mesh/test.xml') #3
 #size_ref = 2
 #mesh = Mesh('mesh/cracked_plate_fine.xml')
-size_ref = 1
-mesh = Mesh('mesh/cracked_plate_coarse.xml')
+#size_ref = 1
+#mesh = Mesh('mesh/cracked_plate_coarse.xml')
 h = mesh.hmax()
 #print(h)
 
@@ -107,7 +107,7 @@ cells_with_cracked_facet = set()
 not_breakable_facets = set()
 
 cracking_facets = set()
-cells_to_test = set()
+#cells_to_test = set()
 #before the computation begins, we break the facets to have a crack of length 1
 for (x,y) in problem.Graph.edges():
     f = problem.Graph[x][y]['dof_CR'][0] // d
@@ -187,15 +187,18 @@ while u_D.t < T:
         cracking_facets = set()
         
         #Computing new Gh
-        Gh = problem.energy_release_rates(vec_u_CR, cracked_facets, not_breakable_facets)
+        #Gh = problem.energy_release_rates(vec_u_CR, cracked_facets, not_breakable_facets)
+        Gh = problem.energy_release_rates_bis(vec_u_CR, vec_u_DG)
 
-        #Potentially cracking facet with biggest Gh
+        #Potentially cracking vertex with biggest Gh
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh)[idx])]
 
         #Choosing which facet to break
-        for f in indices:
-            if Gh[f] > Gc:
+        for v in indices:
+            if Gh[v] > Gc:
+                f = kinking_criterion(problem, v, vec_u_CR, not_breakable_facets)
+                #Updating
                 cracking_facets = {f}
                 c1,c2 = problem.facet_num.get(f)
                 cells_with_cracked_facet |= {c1,c2}

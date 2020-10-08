@@ -359,4 +359,29 @@ def energy_release_rate_vertex_bis(problem, broken_vertices, broken_facets, vec_
         res[v] = Gh_v
 
     return res
+
+def kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
+    n = FacetNormal(problem.mesh)
+    S = FacetArea(problem.mesh)
+    u_CR = TrialFunction(problem.CR)
+    Dv_DG = TestFunction(problem.W)
+
+    #To get normal stress
+    a = inner(dot(avg(Dv_DG),n('+')), u_CR('+')) / S('+') * dS
+    A = assemble(a)
+    row,col,val = as_backend_type(A).mat().getValuesCSR()
+    A = csr_matrix((val, col, row))
+
+    if problem.d == 1:
+        normal_stresses = abs(A.T * problem.mat_stress * problem.mat_grad * vec_u_CR)
+    elif problem.d == 2:
+        normal_stresses = A.T * problem.mat_stress * problem.mat_grad * vec_u_CR
+        normal_stresses = normal_stresses.reshape((problem.initial_nb_dof_CR // problem.d, problem.dim))
+        #Calculer normals sur toutes les facettes !
+        normal_stresses = np.sum(normal_stresses * normals, axis=0)
+    breakable_facets = list(set(problem.facets_vertex.get(v)) - not_breakable_facets)
+    print(breakable_facets)
+    print(normal_stresses[breakable_facets])
+
+    return breakable_facets[np.argmax(normal_stresses[breakable_facets])]
             

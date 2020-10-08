@@ -19,7 +19,7 @@ k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
 folder = 'test_structured'
-size_ref = 5 #40 #20 #10
+size_ref = 20 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 #folder = 'no_initial_crack'
 #folder = 'unstructured'
@@ -198,6 +198,7 @@ while u_D.t < T:
         ##Potentially cracking vertex with biggest Gh
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh)[idx])]
+        print(Gh[idx[0]])
 
         #Choosing which facet to break
         for v in indices:

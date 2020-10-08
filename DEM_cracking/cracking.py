@@ -332,7 +332,9 @@ def energy_release_rate_vertex_bis(problem, broken_vertices, broken_facets, vec_
     res = np.zeros(problem.mesh.num_vertices())
     
     #To get facet jumps
-    v_DG = TestFunction(self.DG_0)
+    S = FacetArea(problem.mesh)
+    u_CR = TrialFunction(problem.CR)
+    v_DG = TestFunction(problem.DG_0)
     a = inner(jump(v_DG), u_CR('+')) / S('+') * dS
     A = assemble(a)
     row,col,val = as_backend_type(A).mat().getValuesCSR()
@@ -341,7 +343,7 @@ def energy_release_rate_vertex_bis(problem, broken_vertices, broken_facets, vec_
 
     #To get stresses in cells
     stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
-    stress = stress.reshape((problem.nb_dof_DG // problem.d, problem.dim))
+    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.dim)))
     
     for v in broken_vertices:
         Gh_v = -1
@@ -349,10 +351,10 @@ def energy_release_rate_vertex_bis(problem, broken_vertices, broken_facets, vec_
             if f in broken_facets:
                 n1 = problem.facet_num.get(f)[0]
                 normal =  problem.Graph[n1][problem.nb_dof_cells // problem.d + f]['normal']
-                for fp in problem.facet_vertices.get(v):
-                    if fp not in broken_facets:
+                for fp in problem.facets_vertex.get(v):
+                    if len(problem.facet_num.get(fp)) == 2:
                         c1,c2 = problem.facet_num.get(fp)
-                        Gh = np.pi*0.5*dot(stress[c1]+stress[c2],normal) * jumps
+                        Gh = np.pi*0.5*np.dot(stress[c1]+stress[c2],normal) * jumps[fp]
                         Gh_v = max(Gh_v, Gh)
         res[v] = Gh_v
 

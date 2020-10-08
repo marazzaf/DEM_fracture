@@ -354,33 +354,32 @@ def energy_release_rate_vertex_bis(problem, broken_vertices, broken_facets, vec_
                 for fp in problem.facets_vertex.get(v):
                     if len(problem.facet_num.get(fp)) == 2:
                         c1,c2 = problem.facet_num.get(fp)
-                        Gh = np.pi*0.5*np.dot(stress[c1]+stress[c2],normal) * jumps[fp]
+                        Gh = np.pi*0.5*abs(np.dot(stress[c1]+stress[c2],normal) * jumps[fp]) #Change in plane elasticity
                         Gh_v = max(Gh_v, Gh)
         res[v] = Gh_v
 
     return res
 
 def kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
-    n = FacetNormal(problem.mesh)
-    S = FacetArea(problem.mesh)
-    u_CR = TrialFunction(problem.CR)
-    Dv_DG = TestFunction(problem.W)
+    #To get stresses in cells
+    stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
+    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.dim)))
 
-    #To get normal stress
-    a = inner(dot(avg(Dv_DG),n('+')), u_CR('+')) / S('+') * dS
-    A = assemble(a)
-    row,col,val = as_backend_type(A).mat().getValuesCSR()
-    A = csr_matrix((val, col, row))
+    breakable_facets = list(set(problem.facets_vertex.get(v)) - not_breakable_facets)
+    print(breakable_facets)
 
+    normal_stresses  = []
     if problem.d == 1:
-        normal_stresses = abs(A.T * problem.mat_stress * problem.mat_grad * vec_u_CR)
-    elif problem.d == 2:
+        for f in breakable_facets:
+            c1,c2 = problem.facet_num.get(f)
+            normal = problem.Graph[c1][c2]['normal']
+            normal_stresses.append(abs(np.dot(stress[f],normal)))
+    elif problem.d == 2: #Adapt for plane elasticity
         normal_stresses = A.T * problem.mat_stress * problem.mat_grad * vec_u_CR
         normal_stresses = normal_stresses.reshape((problem.initial_nb_dof_CR // problem.d, problem.dim))
         #Calculer normals sur toutes les facettes !
         normal_stresses = np.sum(normal_stresses * normals, axis=0)
-    breakable_facets = list(set(problem.facets_vertex.get(v)) - not_breakable_facets)
-    print(breakable_facets)
+    
 
-    return breakable_facets[np.argmax(normal_stresses[breakable_facets])]
+    return breakable_facets[np.argmax(normal_stresses)]
             

@@ -19,7 +19,7 @@ k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
 folder = 'test_structured'
-size_ref = 20 #40 #20 #10
+size_ref = 10 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 #folder = 'no_initial_crack'
 #folder = 'unstructured'
@@ -190,15 +190,19 @@ while u_D.t < T:
         
         #Computing new Gh
         #Gh = problem.energy_release_rates(vec_u_CR, cracked_facets, not_breakable_facets)
-        Gh = problem.energy_release_rates_bis(vec_u_CR, vec_u_DG)
-        aux = np.copy(Gh)
-        aux[list(broken_vertices)] = np.zeros_like(broken_vertices)
-        Gh -= aux
+        Gh = energy_release_rate_vertex_bis(problem, broken_vertices, cracked_facets, vec_u_CR, vec_u_DG)
+        #aux = np.copy(Gh)
+        #aux[list(broken_vertices)] = np.zeros_like(broken_vertices)
+        #Gh -= aux
+        U = FunctionSpace(problem.mesh, 'CG', 1)
+        u = Function(U, name="Gh")
+        u.vector().set_local(Gh)
+        file.write(u)
+        #sys.exit()
 
         ##Potentially cracking vertex with biggest Gh
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh)[idx])]
-        print(Gh[idx[0]])
 
         #Choosing which facet to break
         for v in indices:

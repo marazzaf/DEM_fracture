@@ -191,15 +191,15 @@ while u_D.t < T:
         #Computing new Gh
         #Gh = problem.energy_release_rates(vec_u_CR, cracked_facets, not_breakable_facets)
         Gh = energy_release_rate_vertex_bis(problem, broken_vertices, cracked_facets, vec_u_CR, vec_u_DG)
-        Gh[Gh.nonzero()] = np.ones_like(Gh.nonzero())
+        #Gh[Gh.nonzero()] = np.ones_like(Gh.nonzero())
         #aux = np.copy(Gh)
         #aux[list(broken_vertices)] = np.zeros_like(broken_vertices)
         #Gh -= aux
-        U = FunctionSpace(problem.mesh, 'CG', 1)
-        u = Function(U, name="Gh")
-        u.vector().set_local(Gh)
-        file.write(u)
-        sys.exit()
+        #U = FunctionSpace(problem.mesh, 'CG', 1)
+        #u = Function(U, name="Gh")
+        #u.vector().set_local(Gh)
+        #file.write(u)
+        #sys.exit()
 
         ##Potentially cracking vertex with biggest Gh
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?

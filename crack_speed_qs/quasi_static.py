@@ -18,7 +18,7 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 20 #80 #40 #20 #10
+size_ref = 10 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -87,7 +87,7 @@ areas = assemble(f_CR('+') * (dS + ds)).get_local() #For crack speeds
 #length crack output
 #length_crack = open('h_0_05/length_crack_%i.txt' % size_ref, 'w')
 #length_crack = open('test/chi_%i.txt' % 1, 'w')
-folder = 'constant_chi_4_5_bis'
+folder = 'constant_chi_10'
 length_crack = open(folder+'/length_crack_%i.txt' % size_ref, 'w')
 
 count_output_crack = 0
@@ -132,7 +132,7 @@ A_not_D,B = problem.schur_complement(A)
 #definition of time-stepping parameters
 T = 1. / k
 u_D.t = 0.24 / k #il ne se passe rien avant...
-chi = 4.5 #450 #45 #4.5 #0.45
+chi = 10 #450 #45 #4.5 #0.45
 dt = h / (chi*k)
 #dt = 5.6e-3 / k
 #chi = h / 5.6e-3
@@ -182,16 +182,34 @@ while u_D.t < T:
         #print('Gh crack tip: %.5e' % to_print)
 
         #Testing crack advance #Should be modified for kinking
+        #pos_closest = problem.Graph[c1][problem.nb_dof_cells // problem.d + closest]['barycentre'][0]
+        #for f in problem.facet_to_facet.get(closest):
+        #    if len(problem.facet_num.get(f)) == 2:
+        #        n1,n2 = problem.facet_num.get(f)
+        #        pos = problem.Graph[n1][n2]['barycentre']
+        #        if pos[0] > pos_closest and np.absolute(pos[1]) < 1.e-15:
+        #            Gh = -1
+        #            for v in problem.Graph[n1][n2]['vertices_ind']:
+        #                Gh = max(Gh, Gh_v[v])
+        #            if Gh > Gc:
+        #                cracking_facets = {f}
+        #                closest = f #Update closest
+        #                broken_vertices |= set(problem.Graph[n1][n2]['vertices_ind'])
+        #                break
+        #            else:
+        #                inverting = False
+
+        #Finding which facet to break
+        c1 = problem.facet_num.get(closest)[0]
         pos_closest = problem.Graph[c1][problem.nb_dof_cells // problem.d + closest]['barycentre'][0]
+        #Testing cracking
         for f in problem.facet_to_facet.get(closest):
             if len(problem.facet_num.get(f)) == 2:
                 n1,n2 = problem.facet_num.get(f)
                 pos = problem.Graph[n1][n2]['barycentre']
                 if pos[0] > pos_closest and np.absolute(pos[1]) < 1.e-15:
-                    Gh = -1
-                    for v in problem.Graph[n1][n2]['vertices_ind']:
-                        Gh = max(Gh, Gh_v[v])
-                    if Gh > Gc:
+                    #print('Gh facet: %.5e\n' % Gh[f])
+                    if Gh[f] > Gc:
                         cracking_facets = {f}
                         closest = f #Update closest
                         broken_vertices |= set(problem.Graph[n1][n2]['vertices_ind'])
@@ -199,24 +217,6 @@ while u_D.t < T:
                     else:
                         inverting = False
 
-##Finding which facet to break
-#c1 = problem.facet_num.get(closest)[0]
-#pos_closest = problem.Graph[c1][problem.nb_dof_cells // problem.d + closest]['barycentre'][0]
-##Testing cracking
-#for f in problem.facet_to_facet.get(closest):
-#    if len(problem.facet_num.get(f)) == 2:
-#        n1,n2 = problem.facet_num.get(f)
-#        pos = problem.Graph[n1][n2]['barycentre']
-#        if pos[0] > pos_closest and np.absolute(pos[1]) < 1.e-15:
-#            #print('Gh facet: %.5e\n' % Gh[f])
-#            if Gh[f] > Gc:
-#                cracking_facets = {f}
-#                closest = f #Update closest
-#                broken_vertices |= set(problem.Graph[n1][n2]['vertices_ind'])
-#                break
-#            else:
-#                inverting = False
-#
             #get correspondance between dof
         for f in cracking_facets:
             n1,n2 = problem.facet_num.get(f)

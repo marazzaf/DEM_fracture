@@ -175,3 +175,18 @@ def facets_in_cell(problem): #gives facets contained in every cell
         res[c.index()] = set(list_facet_nums)
         
     return res
+
+def facets_containing_vertex(problem):
+    res = dict()
+    dofmap_CR = problem.CR.dofmap()
+
+    for v in vertices(problem.mesh):
+        aux = []
+        
+        for f in facets(v):
+            num_facet_dof = dofmap_CR.entity_dofs(problem.mesh, problem.dim - 1, np.array([f.index()], dtype="uintp")) #number of the dofs in CR
+            aux.append(num_facet_dof[0] // problem.d)
+
+        res[v.index()] = aux
+            
+    return res

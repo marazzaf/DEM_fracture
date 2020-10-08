@@ -169,10 +169,6 @@ while u_D.t < T:
         
         #Computing new Gh
         #Gh = problem.energy_release_rates(vec_u_CR, cracked_facets)
-        #Gh_bis = problem.energy_release_rates_bis(vec_u_CR, vec_u_DG)
-        #print(max(Gh),max(Gh_bis))
-        #print(max(Gh)/max(Gh_bis))
-        #Just for a test
         Gh = problem.energy_release_rates_bis(vec_u_CR, vec_u_DG)
 
         #Finding which facet to break

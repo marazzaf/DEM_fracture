@@ -105,6 +105,7 @@ cracked_facets = set()
 #length_cracked_facets = 0.
 cells_with_cracked_facet = set()
 not_breakable_facets = set()
+broken_vertices = set()
 
 cracking_facets = set()
 #cells_to_test = set()
@@ -116,6 +117,7 @@ for (x,y) in problem.Graph.edges():
         cracking_facets.add(f)
         cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
         cells_with_cracked_facet |= {x,y}
+        broken_vertices |= set(problem.Graph[x][y]['vertices_ind'])
         #cells_to_test |= set(facet_num.get(f)) #verifying only one facet per cell breaks
 
 
@@ -189,8 +191,11 @@ while u_D.t < T:
         #Computing new Gh
         #Gh = problem.energy_release_rates(vec_u_CR, cracked_facets, not_breakable_facets)
         Gh = problem.energy_release_rates_bis(vec_u_CR, vec_u_DG)
+        aux = np.copy(Gh)
+        aux[list(broken_vertices)] = np.zeros_like(broken_vertices)
+        Gh -= aux
 
-        #Potentially cracking vertex with biggest Gh
+        ##Potentially cracking vertex with biggest Gh
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh)[idx])]
 
@@ -203,6 +208,7 @@ while u_D.t < T:
                 c1,c2 = problem.facet_num.get(f)
                 cells_with_cracked_facet |= {c1,c2}
                 not_breakable_facets |= (problem.facets_cell.get(c1) | problem.facets_cell.get(c2))
+                broken_vertices |= set(problem.Graph[x][y]['vertices_ind'])
                 break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
             else:
                 inverting = False

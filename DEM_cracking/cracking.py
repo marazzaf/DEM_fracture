@@ -381,7 +381,6 @@ def kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
         normal_stresses = np.sum(normal_stresses * normals, axis=0)
     breakable_facets = list(set(problem.facets_vertex.get(v)) - not_breakable_facets)
     print(breakable_facets)
-    print(normal_stresses[breakable_facets])
 
     return breakable_facets[np.argmax(normal_stresses[breakable_facets])]
             

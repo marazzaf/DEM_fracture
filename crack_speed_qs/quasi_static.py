@@ -174,7 +174,7 @@ while u_D.t < T:
         Gh = problem.energy_release_rates_bis(vec_u_CR, vec_u_DG)
 
         #Test for Gh by vertex
-        Gh_v = energy_release_rate_vertex(problem, broken_vertices, Gh)
+        Gh_v = energy_release_rate_vertex_bis(problem, broken_vertices, Gh)
         #to_print = -1
         c1 = problem.facet_num.get(closest)[0]
         #for v in problem.Graph[c1][problem.nb_dof_cells // problem.d + closest]['vertices_ind']:

@@ -26,6 +26,7 @@ def adapting_graph(self, cracking_facets):
         ex_normal = self.Graph[n1][n2]['normal']
         ex_measure = self.Graph[n1][n2]['measure']
         ex_vertices = self.Graph[n1][n2]['vertices']
+        ex_vertices_ind = self.Graph[n1][n2]['vertices_ind']
         ex_pen = self.Graph[n1][n2]['pen_factor']
         
         #removing link between the two cell dofs
@@ -36,10 +37,10 @@ def adapting_graph(self, cracking_facets):
         self.Graph.add_node(-self.nb_dof_cells // self.d - f, pos=ex_bary, sign=int(-1), vertices=np.array([])) #linked with n2
 
         #adding the connectivity between cell dofs and new facet dofs
-        self.Graph.add_edge(n1, self.nb_dof_cells // self.d + f, num=ex_num, dof_CR=ex_dofs, measure=ex_measure, barycentre=ex_bary, normal=ex_normal, breakable=False, vertices=ex_vertices, pen_factor = ex_pen)
+        self.Graph.add_edge(n1, self.nb_dof_cells // self.d + f, num=ex_num, dof_CR=ex_dofs, measure=ex_measure, barycentre=ex_bary, normal=ex_normal, breakable=False, vertices=ex_vertices, pen_factor = ex_pen, vertices_ind = ex_vertices_ind)
         self.facet_num[f] = [n1]
         new_dof_CR = list(np.arange(self.nb_dof_CR, self.nb_dof_CR+self.d))
-        self.Graph.add_edge(-self.nb_dof_cells // self.d - f, n2, num=self.nb_dof_CR//self.d, dof_CR=new_dof_CR, measure=ex_measure, barycentre=ex_bary, normal=ex_normal, breakable=False, vertices=ex_vertices, pen_factor = ex_pen)
+        self.Graph.add_edge(-self.nb_dof_cells // self.d - f, n2, num=self.nb_dof_CR//self.d, dof_CR=new_dof_CR, measure=ex_measure, barycentre=ex_bary, normal=ex_normal, breakable=False, vertices=ex_vertices, pen_factor = ex_pen, vertices_ind = ex_vertices_ind)
         self.nb_dof_CR += self.d
         self.facet_num[-f] = [n2]
 
@@ -299,7 +300,6 @@ def energy_release_rates_bis(self, vec_u_CR, vec_u_DG):
     A = csr_matrix((val, col, row))
 
     normal_stresses = A.T * self.mat_stress * self.mat_grad * vec_u_CR
-    #normal_stresses = normal_stresses.reshape((self.initial_nb_dof_CR // self.d, self.dim))
 
     #To get facet jumps
     v_DG = TestFunction(self.DG_0)
@@ -309,8 +309,22 @@ def energy_release_rates_bis(self, vec_u_CR, vec_u_DG):
     A = csr_matrix((val, col, row))
 
     jumps = A.T * vec_u_DG
-    #jumps = jumps.reshape((self.initial_nb_dof_CR // self.d, self.dim))
 
     #Assembling
-    return np.pi * abs(normal_stresses * jumps)
-    #return 0.5 * sum(normal_stresses * jumps, axis=0)
+    if self.d == 1:
+        return np.pi * abs(normal_stresses * jumps)
+    elif self.d == 2:
+        normal_stresses = normal_stresses.reshape((self.initial_nb_dof_CR // self.d, self.dim))
+        jumps = jumps.reshape((self.initial_nb_dof_CR // self.d, self.dim))
+        return np.pi * sum(normal_stresses * jumps, axis=0)
+
+def energy_release_rate_vertex(problem, broken_vertices, Gh_facets):
+    res = np.zeros(problem.mesh.num_vertices())
+    for v in broken_vertices:
+        Gh_v = -1
+        for f in problem.facets_vertex.get(v):
+            Gh_v = max(Gh_v, Gh_facets[f])
+        res[v] = Gh_v
+
+    return res
+            

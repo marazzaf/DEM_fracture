@@ -18,7 +18,7 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 20 #80 #40 #20 #10
+size_ref = 5 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -94,6 +94,7 @@ count_output_crack = 0
 cracked_facet_vertices = []
 cracked_facets = set()
 length_cracked_facets = 0.
+broken_vertices = set()
 
 cracking_facets = set()
 #before the computation begins, we break the facets to have a crack of length 1
@@ -105,6 +106,7 @@ for (x,y) in problem.Graph.edges():
         cracking_facets.add(f)
         cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
         length_cracked_facets += areas[f]
+        broken_vertices |= set(problem.Graph[x][y]['vertices_ind'])
         if pos[0] > l0 - h:
             closest = f
 #adapting after crack
@@ -171,17 +173,29 @@ while u_D.t < T:
         #Gh = problem.energy_release_rates(vec_u_CR, cracked_facets)
         Gh = problem.energy_release_rates_bis(vec_u_CR, vec_u_DG)
 
+        #Test
+        Gh_v = energy_release_rate_vertex(problem, broken_vertices, Gh)
+        to_print = -1
+        n1 = problem.facet_num.get(closest)[0]
+        for v in problem.Graph[n1][problem.nb_dof_cells // problem.d + closest]['vertices_ind']:
+            to_print = max(to_print, Gh_v[v])
+        print('Gh crack tip: %.5e' % to_print)
+
         #Finding which facet to break
         c1 = problem.facet_num.get(closest)[0]
         pos_closest = problem.Graph[c1][problem.nb_dof_cells // problem.d + closest]['barycentre'][0]
+        
+        #Testing cracking
         for f in problem.facet_to_facet.get(closest):
             if len(problem.facet_num.get(f)) == 2:
                 n1,n2 = problem.facet_num.get(f)
                 pos = problem.Graph[n1][n2]['barycentre']
                 if pos[0] > pos_closest and np.absolute(pos[1]) < 1.e-15:
+                    print('Gh facet: %.5e\n' % Gh[f])
                     if Gh[f] > Gc:
                         cracking_facets = {f}
                         closest = f #Update closest
+                        broken_vertices |= set(problem.Graph[n1][n2]['vertices_ind'])
                         break
                     else:
                         inverting = False

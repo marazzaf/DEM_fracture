@@ -106,7 +106,7 @@ def connectivity_graph(problem, dirichlet_dofs):
             bary_n2 = G.nodes[n2]['pos']
          
             #adding edge
-            G.add_edge(aux_bis[0],aux_bis[1], num=num_global_ddl_facet[0] // problem.d, recon=set([]), dof_CR=num_global_ddl_facet, measure=area, barycentre=bary, normal=normal, vertices=vert, pen_factor=pen_factor[num_global_ddl_facet[0] // problem.d], breakable=True) #, vertices_ind=vert_ind)
+            G.add_edge(aux_bis[0],aux_bis[1], num=num_global_ddl_facet[0] // problem.d, recon=set([]), dof_CR=num_global_ddl_facet, measure=area, barycentre=bary, normal=normal, vertices=vert, pen_factor=pen_factor[num_global_ddl_facet[0] // problem.d], breakable=True, vertices_ind=vert_ind)
             
         elif len(aux_bis) == 1: #add the link between a cell dof and a boundary facet dof
             for c in cells(f): #only one cell contains the boundary facet
@@ -126,7 +126,7 @@ def connectivity_graph(problem, dirichlet_dofs):
             
             #number of the dof is total number of cells + num of the facet
             G.add_node(problem.nb_dof_cells // problem.d + num_global_ddl_facet[0] // problem.d, pos=bary, dof=aux, dirichlet_components=components)
-            G.add_edge(aux_bis[0], problem.nb_dof_cells // problem.d + num_global_ddl_facet[0] // problem.d, num=num_global_ddl_facet[0] // problem.d, dof_CR=num_global_ddl_facet, measure=area, barycentre=bary, normal=normal, vertices=vert, pen_factor=pen_factor[num_global_ddl_facet[0] // problem.d], breakable=False)
+            G.add_edge(aux_bis[0], problem.nb_dof_cells // problem.d + num_global_ddl_facet[0] // problem.d, num=num_global_ddl_facet[0] // problem.d, dof_CR=num_global_ddl_facet, measure=area, barycentre=bary, normal=normal, vertices=vert, pen_factor=pen_factor[num_global_ddl_facet[0] // problem.d], breakable=False, vertices_ind=vert_ind)
             G.nodes[aux_bis[0]]['bnd'] = True #Cell is on the boundary of the domain
                 
     return G

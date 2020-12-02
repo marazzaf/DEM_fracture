@@ -105,6 +105,7 @@ cracked_facets = set()
 cells_with_cracked_facet = set()
 not_breakable_facets = set()
 cracking_facets = set()
+broken_vertices = set()
 
 #before the computation begins, we break the facets
 for (x,y) in problem.Graph.edges():
@@ -114,6 +115,7 @@ for (x,y) in problem.Graph.edges():
         cracking_facets.add(f)
         cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
         cells_with_cracked_facet |= {x,y}
+        broken_vertices |= set(problem.Graph[x][y]['vertices_ind'])
 
 #adapting after crack
 problem.removing_penalty(cracking_facets)
@@ -183,23 +185,44 @@ while u_D.t < T:
 
         cracking_facets = set()
 
-        #Computing new Gh
-        Gh = problem.energy_release_rates(vec_u_CR, cracked_facets, not_breakable_facets)
+        ##Computing new Gh
+        #Gh = problem.energy_release_rates(vec_u_CR, cracked_facets, not_breakable_facets)
+        #
+        ##Potentially cracking facet with biggest Gh
+        #idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
+        #indices = idx[np.argsort((-Gh)[idx])]
+        #
+        ##Choosing which facet to break
+        #for f in indices:
+        #    if Gh[f] > Gc:
+        #        cracking_facets = {f}
+        #        c1,c2 = problem.facet_num.get(f)
+        #        cells_with_cracked_facet |= {c1,c2}
+        #        not_breakable_facets |= (problem.facets_cell.get(c1) | problem.facets_cell.get(c2))
+        #        broken_vertices |= set(problem.Graph[c1][c2]['vertices_ind'])
+        #        break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
+        #    else:
+        #        inverting = False
 
-        #Potentially cracking facet with biggest Gh
+        #Computing Gh per vertex and then kinking criterion
+        Gh_v = problem.energy_release_rate_vertex_bis(problem, broken_vertices, cracked_facets, vec_u_CR, vec_u_DG)
+
+        #Looking for facet with largest Gh
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh)[idx])]
 
-        #Choosing which facet to break
-        for f in indices:
-            if Gh[f] > Gc:
-                cracking_facets = {f}
-                c1,c2 = problem.facet_num.get(f)
-                cells_with_cracked_facet |= {c1,c2}
-                not_breakable_facets |= (problem.facets_cell.get(c1) | problem.facets_cell.get(c2))
-                break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
-            else:
-                inverting = False
+        #Kinking to choose breaking facet
+        for v in indices:
+            if Gh_v[v] > Gc:
+        #        cracking_facets = {f}
+        #        c1,c2 = problem.facet_num.get(f)
+        #        cells_with_cracked_facet |= {c1,c2}
+        #        not_breakable_facets |= (problem.facets_cell.get(c1) | problem.facets_cell.get(c2))
+        #        broken_vertices |= set(problem.Graph[c1][c2]['vertices_ind'])
+        #        break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
+        #    else:
+        #        inverting = False
+        
 
         if len(cracking_facets) > 0:
             #outputs

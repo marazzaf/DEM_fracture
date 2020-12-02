@@ -18,7 +18,7 @@ Gc = 0.01
 k = 1.e-3 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 20 #80 #40 #20 #10
+size_ref = 5 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -71,6 +71,9 @@ mat_elas = problem.elastic_bilinear_form(ref_elastic)
 
 #Stresses output
 problem.mat_stress = output_stress(problem, sigma, eps)
+problem.mat_jump_bis = problem.mat_jump()
+#print(problem.mat_jump.shape)
+#sys.exit()
 
 #useful
 solution_u_DG = Function(problem.DG_0,  name="disp DG")

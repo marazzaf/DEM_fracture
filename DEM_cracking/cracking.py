@@ -331,19 +331,16 @@ def energy_release_rate_vertex(problem, broken_vertices, Gh_facets):
 def energy_release_rate_vertex_bis(problem, broken_vertices, broken_facets, vec_u_CR, vec_u_DG):
     res = np.zeros(problem.mesh.num_vertices())
     
-    #To get facet jumps
-    S = FacetArea(problem.mesh)
-    u_CR = TrialFunction(problem.CR)
-    v_DG = TestFunction(problem.DG_0)
-    a = inner(jump(v_DG), u_CR('+')) / S('+') * dS
-    A = assemble(a)
-    row,col,val = as_backend_type(A).mat().getValuesCSR()
-    A = csr_matrix((val, col, row))
-    jumps = A.T * vec_u_DG
+    #Facet jumps
+    jumps = problem.mat_jump_bis * vec_u_DG
 
     #To get stresses in cells
     stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
-    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.dim)))
+    if problem.d == 1: #antiplane case
+        stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.dim)))
+    elif problem.dim == 2: #plane elasticity
+        stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.d, problem.dim)))
+        jumps = jumps.reshape((problem.initial_nb_dof_CR // problem.d, problem.dim))
     
     for v in broken_vertices:
         Gh_v = -1
@@ -354,8 +351,10 @@ def energy_release_rate_vertex_bis(problem, broken_vertices, broken_facets, vec_
                 for fp in problem.facets_vertex.get(v):
                     if len(problem.facet_num.get(fp)) == 2:
                         c1,c2 = problem.facet_num.get(fp)
-                        #if problem.d == 1:
-                        Gh = np.pi*0.5*abs(np.dot(stress[c1]+stress[c2],normal) * jumps[fp]) #Change in plane elasticity
+                        if problem.d == 1:
+                            Gh = np.pi*0.5*abs(np.dot(stress[c1]+stress[c2],normal) * jumps[fp]) #Antiplane
+                        elif problem.d == 2:
+                            Gh = np.pi*0.5*abs(np.dot(np.dot(stress[c1]+stress[c2],normal), jumps[fp])) #Plane elasticity
                         Gh_v = max(Gh_v, Gh)
         res[v] = Gh_v
 
@@ -383,4 +382,36 @@ def kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
     
 
     return breakable_facets[np.argmax(normal_stresses)]
-            
+
+def K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
+    #To get stresses in cells
+    stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
+    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.dim)))
+
+    breakable_facets = list(set(problem.facets_vertex.get(v)) - not_breakable_facets)
+    #print(breakable_facets)
+
+    #Compute the K1 and K2 in each facet. Use the normal to the broken facet
+
+    normal_stresses  = []
+    if problem.d == 1:
+        for f in breakable_facets:
+            c1,c2 = problem.facet_num.get(f)
+            normal = problem.Graph[c1][c2]['normal']
+            normal_stresses.append(abs(np.dot(stress[f],normal)))
+    elif problem.d == 2: #Adapt for plane elasticity
+        normal_stresses = A.T * problem.mat_stress * problem.mat_grad * vec_u_CR
+        normal_stresses = normal_stresses.reshape((problem.initial_nb_dof_CR // problem.d, problem.dim))
+        #Calculer normals sur toutes les facettes !
+        normal_stresses = np.sum(normal_stresses * normals, axis=0)
+
+    return breakable_facets[np.argmax(normal_stresses)]
+
+def mat_jump(problem):
+    S = FacetArea(problem.mesh)
+    v_CR = TestFunction(problem.CR)
+    u_DG = TrialFunction(problem.DG_0)
+    a = inner(jump(u_DG), v_CR('+')) / S('+') * dS
+    A = assemble(a)
+    row,col,val = as_backend_type(A).mat().getValuesCSR()
+    return csr_matrix((val, col, row), shape=(problem.initial_nb_dof_CR, problem.nb_dof_cells))

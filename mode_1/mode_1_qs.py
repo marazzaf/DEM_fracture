@@ -22,7 +22,7 @@ k = 1. #loading speed
 Ll, l0, H = 32e-3, 4e-3, 16e-3
 
 #mesh
-size_ref = 20 #20 #10 #5 #1 #debug
+size_ref = 5 #20 #10 #5 #1 #debug
 mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref*8, size_ref*4, "crossed")
 folder = 'structured'
 #folder = 'unstructured'
@@ -91,6 +91,8 @@ mat_elas = problem.elastic_bilinear_form(ref_elastic)
 
 #Stresses output
 problem.mat_stress = output_stress(problem, sigma, eps)
+#Facet jump output
+problem.mat_jump_bis = problem.mat_jump()
 
 #useful
 solution_u_DG = Function(problem.DG_0,  name="disp DG")
@@ -205,7 +207,8 @@ while u_D.t < T:
         #        inverting = False
 
         #Computing Gh per vertex and then kinking criterion
-        Gh_v = problem.energy_release_rate_vertex_bis(problem, broken_vertices, cracked_facets, vec_u_CR, vec_u_DG)
+        Gh_v = problem.energy_release_rate_vertex_bis(broken_vertices, cracked_facets, vec_u_CR, vec_u_DG)
+        sys.exit()
 
         #Looking for facet with largest Gh
         idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
@@ -214,14 +217,15 @@ while u_D.t < T:
         #Kinking to choose breaking facet
         for v in indices:
             if Gh_v[v] > Gc:
-        #        cracking_facets = {f}
-        #        c1,c2 = problem.facet_num.get(f)
-        #        cells_with_cracked_facet |= {c1,c2}
-        #        not_breakable_facets |= (problem.facets_cell.get(c1) | problem.facets_cell.get(c2))
-        #        broken_vertices |= set(problem.Graph[c1][c2]['vertices_ind'])
-        #        break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
-        #    else:
-        #        inverting = False
+                f = K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets)
+                cracking_facets = {f}
+                c1,c2 = problem.facet_num.get(f)
+                cells_with_cracked_facet |= {c1,c2}
+                not_breakable_facets |= (problem.facets_cell.get(c1) | problem.facets_cell.get(c2))
+                broken_vertices |= set(problem.Graph[c1][c2]['vertices_ind'])
+                break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
+            else:
+                inverting = False
         
 
         if len(cracking_facets) > 0:

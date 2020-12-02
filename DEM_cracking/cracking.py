@@ -386,26 +386,36 @@ def kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
 def K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
     #To get stresses in cells
     stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
-    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.dim)))
+    #if problem.d == 1: #antiplane case
+    #    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.dim)))
+    #elif problem.d == 2: #plane elasticity
+    #    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.d, problem.dim)))
 
     breakable_facets = list(set(problem.facets_vertex.get(v)) - not_breakable_facets)
     #print(breakable_facets)
+    list_K2 = []
 
     #Compute the K1 and K2 in each facet. Use the normal to the broken facet
+    #To get normal stress
+    n = FacetNormal(problem.mesh)
+    S = FacetArea(problem.mesh)
+    v_CR = TestFunction(problem.CR)
+    Du_DG = TrialFunction(problem.W)
+    a = inner(dot(avg(Du_DG),n('+')), v_CR('+')) / S('+') * dS
+    A = assemble(a)
+    row,col,val = as_backend_type(A).mat().getValuesCSR()
+    A = csr_matrix((val, col, row))
+    normal_stresses = A  * stresses
+    normal_stresses = normal_stresses.reshape((problem.initial_nb_dof_CR // problem.d, problem.dim))
 
-    normal_stresses  = []
-    if problem.d == 1:
-        for f in breakable_facets:
-            c1,c2 = problem.facet_num.get(f)
-            normal = problem.Graph[c1][c2]['normal']
-            normal_stresses.append(abs(np.dot(stress[f],normal)))
-    elif problem.d == 2: #Adapt for plane elasticity
-        normal_stresses = A.T * problem.mat_stress * problem.mat_grad * vec_u_CR
-        normal_stresses = normal_stresses.reshape((problem.initial_nb_dof_CR // problem.d, problem.dim))
-        #Calculer normals sur toutes les facettes !
-        normal_stresses = np.sum(normal_stresses * normals, axis=0)
+    for f in breakable_facets:
+        c1,c2 = problem.facet_num.get(f)
+        normal = problem.Graph[c1][c2]['normal']
+        tangent = np.array([-normal[1], normal[0]])
+        assert problem.d == 2
+        list_K2.append(abs(np.dot(normal_stresses, tangent)))
 
-    return breakable_facets[np.argmax(normal_stresses)]
+    return breakable_facets[np.argmin(np.array(list_K2))]
 
 def mat_jump(problem):
     S = FacetArea(problem.mesh)

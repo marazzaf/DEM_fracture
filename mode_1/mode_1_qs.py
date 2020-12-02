@@ -208,11 +208,10 @@ while u_D.t < T:
 
         #Computing Gh per vertex and then kinking criterion
         Gh_v = problem.energy_release_rate_vertex_bis(broken_vertices, cracked_facets, vec_u_CR, vec_u_DG)
-        sys.exit()
 
         #Looking for facet with largest Gh
-        idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
-        indices = idx[np.argsort((-Gh)[idx])]
+        idx = np.argpartition(Gh_v, -20)[-20:] #is 20 enough?
+        indices = idx[np.argsort((-Gh_v)[idx])]
 
         #Kinking to choose breaking facet
         for v in indices:
@@ -226,7 +225,6 @@ while u_D.t < T:
                 break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
             else:
                 inverting = False
-        
 
         if len(cracking_facets) > 0:
             #outputs

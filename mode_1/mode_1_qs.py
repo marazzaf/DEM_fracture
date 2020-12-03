@@ -212,6 +212,12 @@ while u_D.t < T:
         #Looking for facet with largest Gh
         idx = np.argpartition(Gh_v, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh_v)[idx])]
+        #print(indices)
+        #print(Gh_v[1631])
+        #print(problem.facets_vertex.get(1631))
+        #print(cracked_facets)
+        #print(set(problem.facets_vertex.get(1631)) & cracked_facets)
+        #print('stop')
 
         #Kinking to choose breaking facet
         for v in indices:
@@ -261,6 +267,6 @@ while u_D.t < T:
             F = problem.mat_D * problem.trace_matrix.T * FF
             L_not_D = -B * F
 
-    cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
+            cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
 
 print('End of computation !')

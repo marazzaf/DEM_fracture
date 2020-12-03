@@ -356,6 +356,7 @@ def energy_release_rate_vertex_bis(problem, broken_vertices, broken_facets, vec_
                         elif problem.d == 2:
                             Gh = np.pi*0.5*abs(np.dot(np.dot(stress[c1]+stress[c2],normal), jumps[fp])) #Plane elasticity
                         Gh_v = max(Gh_v, Gh)
+        assert Gh_v > 0 #otherwise problem
         res[v] = Gh_v
 
     return res
@@ -415,7 +416,7 @@ def K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
         assert problem.d == 2
         K2 = abs(np.dot(normal_stresses[f], tangent))
         list_K2.append(K2)
-        print('%.3e   %.3e' % (problem.Graph[c1][c2]['barycentre'][1],K2))
+        #print('%.3e   %.3e' % (problem.Graph[c1][c2]['barycentre'][1],K2))
 
     return breakable_facets[np.argmin(np.array(list_K2))]
 

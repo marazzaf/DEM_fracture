@@ -22,7 +22,7 @@ k = 1. #loading speed
 Ll, l0, H = 32e-3, 4e-3, 16e-3
 
 #mesh
-size_ref = 5 #20 #10 #5 #1 #debug
+size_ref = 10 #20 #10 #5 #1 #debug
 mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref*8, size_ref*4, "crossed")
 folder = 'structured'
 #folder = 'unstructured'
@@ -142,11 +142,11 @@ for c in cells_with_cracked_facet:
 A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
-chi = 4.5
+chi = 0.1
 dt = h / chi
 print('dt: %.5e' % dt)
 T = 1. #100 * dt
-t = 0.
+u_D.t = 1.8e-3
 
 while u_D.t < T:
     u_D.t += dt

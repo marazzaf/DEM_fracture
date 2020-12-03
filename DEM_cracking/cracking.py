@@ -392,7 +392,7 @@ def K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
     #    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.d, problem.dim)))
 
     breakable_facets = list(set(problem.facets_vertex.get(v)) - not_breakable_facets)
-    #print(breakable_facets)
+    assert len(breakable_facets) > 0 #otherwise no facet can be broken
     list_K2 = []
 
     #Compute the K1 and K2 in each facet. Use the normal to the broken facet
@@ -413,7 +413,9 @@ def K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
         normal = problem.Graph[c1][c2]['normal']
         tangent = np.array([-normal[1], normal[0]])
         assert problem.d == 2
-        list_K2.append(abs(np.dot(normal_stresses, tangent)))
+        K2 = abs(np.dot(normal_stresses[f], tangent))
+        list_K2.append(K2)
+        print('%.3e   %.3e' % (problem.Graph[c1][c2]['barycentre'][1],K2))
 
     return breakable_facets[np.argmin(np.array(list_K2))]
 

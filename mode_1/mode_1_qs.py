@@ -24,12 +24,12 @@ Ll, l0, H = 32e-3, 4e-3, 16e-3
 #mesh
 size_ref = 10 #20 #10 #5 #1 #debug
 mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref*8, size_ref*4, "crossed")
-folder = 'structured'
-#folder = 'unstructured'
+#folder = 'structured'
+folder = 'unstructured'
 #size_ref = 2
 #mesh = Mesh('mesh/plate_5_E_4.xml')
-#size_ref = 1
-#mesh = Mesh('mesh/plate_1_E_3.xml')
+size_ref = 1
+mesh = Mesh('mesh/plate_1_E_3.xml')
 #size_ref = 3
 #mesh = Mesh('mesh/plate_1_E_4.xml')
 h = mesh.hmax()
@@ -223,14 +223,15 @@ while u_D.t < T:
         for v in indices:
             if Gh_v[v] > Gc:
                 f = K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets)
-                cracking_facets = {f}
-                c1,c2 = problem.facet_num.get(f)
-                cells_with_cracked_facet |= {c1,c2}
-                not_breakable_facets |= (problem.facets_cell.get(c1) | problem.facets_cell.get(c2))
-                broken_vertices |= set(problem.Graph[c1][c2]['vertices_ind'])
-                break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
-            else:
-                inverting = False
+                if f != None:
+                    cracking_facets = {f}
+                    c1,c2 = problem.facet_num.get(f)
+                    cells_with_cracked_facet |= {c1,c2}
+                    not_breakable_facets |= (problem.facets_cell.get(c1) | problem.facets_cell.get(c2))
+                    broken_vertices |= set(problem.Graph[c1][c2]['vertices_ind'])
+                    break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
+        if len(cracking_facets) == 0:
+            inverting = False
 
         if len(cracking_facets) > 0:
             #outputs

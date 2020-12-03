@@ -393,32 +393,34 @@ def K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
     #    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.d, problem.dim)))
 
     breakable_facets = list(set(problem.facets_vertex.get(v)) - not_breakable_facets)
-    assert len(breakable_facets) > 0 #otherwise no facet can be broken
-    list_K2 = []
+    if len(breakable_facets) > 0: #otherwise no facet can be broken
+        list_K2 = []
 
-    #Compute the K1 and K2 in each facet. Use the normal to the broken facet
-    #To get normal stress
-    n = FacetNormal(problem.mesh)
-    S = FacetArea(problem.mesh)
-    v_CR = TestFunction(problem.CR)
-    Du_DG = TrialFunction(problem.W)
-    a = inner(dot(avg(Du_DG),n('+')), v_CR('+')) / S('+') * dS
-    A = assemble(a)
-    row,col,val = as_backend_type(A).mat().getValuesCSR()
-    A = csr_matrix((val, col, row))
-    normal_stresses = A  * stresses
-    normal_stresses = normal_stresses.reshape((problem.initial_nb_dof_CR // problem.d, problem.dim))
+        #Compute the K1 and K2 in each facet. Use the normal to the broken facet
+        #To get normal stress
+        n = FacetNormal(problem.mesh)
+        S = FacetArea(problem.mesh)
+        v_CR = TestFunction(problem.CR)
+        Du_DG = TrialFunction(problem.W)
+        a = inner(dot(avg(Du_DG),n('+')), v_CR('+')) / S('+') * dS
+        A = assemble(a)
+        row,col,val = as_backend_type(A).mat().getValuesCSR()
+        A = csr_matrix((val, col, row))
+        normal_stresses = A  * stresses
+        normal_stresses = normal_stresses.reshape((problem.initial_nb_dof_CR // problem.d, problem.dim))
 
-    for f in breakable_facets:
-        c1,c2 = problem.facet_num.get(f)
-        normal = problem.Graph[c1][c2]['normal']
-        tangent = np.array([-normal[1], normal[0]])
-        assert problem.d == 2
-        K2 = abs(np.dot(normal_stresses[f], tangent))
-        list_K2.append(K2)
-        #print('%.3e   %.3e' % (problem.Graph[c1][c2]['barycentre'][1],K2))
+        for f in breakable_facets:
+            c1,c2 = problem.facet_num.get(f)
+            normal = problem.Graph[c1][c2]['normal']
+            tangent = np.array([-normal[1], normal[0]])
+            assert problem.d == 2
+            K2 = abs(np.dot(normal_stresses[f], tangent))
+            list_K2.append(K2)
+            #print('%.3e   %.3e' % (problem.Graph[c1][c2]['barycentre'][1],K2))
 
-    return breakable_facets[np.argmin(np.array(list_K2))]
+        return breakable_facets[np.argmin(np.array(list_K2))]
+    else:
+        return 
 
 def mat_jump(problem):
     S = FacetArea(problem.mesh)

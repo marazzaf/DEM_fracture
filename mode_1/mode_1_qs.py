@@ -142,11 +142,11 @@ for c in cells_with_cracked_facet:
 A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
-chi = 0.1
+chi = 1
 dt = h / chi
 print('dt: %.5e' % dt)
 T = 1. #100 * dt
-u_D.t = 1.8e-3
+u_D.t = 0
 
 while u_D.t < T:
     u_D.t += dt

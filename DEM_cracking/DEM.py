@@ -49,6 +49,7 @@ class DEMProblem:
         self.facet_to_facet = linked_facets(self) #designed to lighten research of potentialy failing facets close to a broken facet
         self.facets_cell = facets_in_cell(self)
         self.facets_vertex = facets_containing_vertex(self)
+        self.facet_areas = facet_areas(self)
 
         #DEM reconstructions
         self.DEM_to_DG = DEM_to_DG_matrix(self)

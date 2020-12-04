@@ -190,3 +190,9 @@ def facets_containing_vertex(problem):
         res[v.index()] = aux
             
     return res
+
+def facet_areas(problem):
+    U = FunctionSpace(problem.mesh, 'CR', 1)
+    v_CR = TestFunction(U)
+    form = v_CR('+') * (dS+ds)
+    return assemble(form).get_local()

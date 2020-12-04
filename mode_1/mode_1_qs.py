@@ -143,7 +143,7 @@ A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 chi = 1
-dt = h / chi
+dt = h
 print('dt: %.5e' % dt)
 T = 1. #100 * dt
 u_D.t = 0

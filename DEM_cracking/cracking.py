@@ -387,10 +387,6 @@ def kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
 def K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
     #To get stresses in cells
     stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
-    #if problem.d == 1: #antiplane case
-    #    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.dim)))
-    #elif problem.d == 2: #plane elasticity
-    #    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.d, problem.dim)))
 
     breakable_facets = list(set(problem.facets_vertex.get(v)) - not_breakable_facets)
     if len(breakable_facets) > 0: #otherwise no facet can be broken
@@ -414,7 +410,7 @@ def K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets):
             normal = problem.Graph[c1][c2]['normal']
             tangent = np.array([-normal[1], normal[0]])
             assert problem.d == 2
-            K2 = abs(np.dot(normal_stresses[f], tangent))
+            K2 = abs(np.dot(normal_stresses[f], tangent)) * np.sqrt(np.pi*problem.facet_areas[f])
             list_K2.append(K2)
             #print('%.3e   %.3e' % (problem.Graph[c1][c2]['barycentre'][1],K2))
 

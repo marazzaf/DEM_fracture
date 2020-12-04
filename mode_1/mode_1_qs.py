@@ -22,8 +22,8 @@ k = 1. #loading speed
 Ll, l0, H = 32e-3, 4e-3, 16e-3
 
 #mesh
-size_ref = 10 #20 #10 #5 #1 #debug
-mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref*8, size_ref*4, "crossed")
+#size_ref = 10 #20 #10 #5 #1 #debug
+#mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref*8, size_ref*4, "crossed")
 #folder = 'structured'
 folder = 'unstructured'
 #size_ref = 2
@@ -222,7 +222,7 @@ while u_D.t < T:
         #Kinking to choose breaking facet
         for v in indices:
             if Gh_v[v] > Gc:
-                f = K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets)
+                f = K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets,cracked_facets)
                 if f != None:
                     cracking_facets = {f}
                     c1,c2 = problem.facet_num.get(f)

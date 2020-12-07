@@ -2,7 +2,7 @@
 L = 65e-3; //Longeur selon x
 H = 120e-3; //Longuer selon y
 l0 = 10e-3; //Size initial crack
-h = 1e-5; //2e-3 //Taille du maillage
+h = 1e-3; //2e-3 //Taille du maillage
 
 //Plate
 Point(1) = {0,H/2,0,h};
@@ -20,11 +20,6 @@ Line(5) = {5,1};
 Line(6) = {2,6};
 
 Line Loop(1) = {1:5};
-
-Plane Surface(1) = {1};
-
-//Crack
-Line{6} In Surface{1};
 
 //Hole 1
 radius = 5e-3;
@@ -67,11 +62,13 @@ Circle(17) = {21, 17, 18};
 Circle(18) = {18, 17, 20};
 Line Loop(4) = {15:18};
 
-//Physical Point(27) = {2, 7}; //limites de la future fissure
+//Final Surface
+Plane Surface(1) = {1, 2, 3, 4};
 
-Physical Line(4) = {4}; //Homogeneous Dirichlet boundary
-Physical Line(53) = {5,3}; //Homogeneous Neumann
-Physical Line(1) = {1}; //First nonhomogeneous Dirichlet
-Physical Line(2) = {2}; //Second nonhomogeneous Dirichlet
+//Crack
+Line{6} In Surface{1};
 
-Physical Surface(11) = {1};
+//Outputs
+Physical Surface(2) = {1};
+Physical Line(2) = {7,8,9,10};
+Physical Line(3) = {11,12,13,14};

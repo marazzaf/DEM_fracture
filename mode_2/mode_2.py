@@ -27,12 +27,12 @@ Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 #folder = 'structured'
 folder = 'unstructured'
 mesh = Mesh()
-size_ref = 2
-with XDMFFile("mesh/fine.xdmf") as infile:
-    infile.read(mesh)
-#size_ref = 1
-#with XDMFFile("mesh/coarse.xdmf") as infile:
+#size_ref = 2
+#with XDMFFile("mesh/fine.xdmf") as infile:
 #    infile.read(mesh)
+size_ref = 1
+with XDMFFile("mesh/coarse.xdmf") as infile:
+    infile.read(mesh)
 h = mesh.hmax()
 #finir plus tard pour taille des mailles.
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
@@ -144,9 +144,9 @@ A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 chi = 1
-dt = 1e-4 #h
+dt = 1e-6 #1e-4 #weird...
 print('dt: %.5e' % dt)
-T = 1. #100 * dt
+T = 0.02e-3
 u_D.t = 0
 
 while u_D.t < T:

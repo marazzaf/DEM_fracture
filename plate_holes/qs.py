@@ -23,12 +23,12 @@ Ll, l0, H = 65e-3, 10e-3, 120e-3
 #mesh
 folder = 'results'
 mesh = Mesh()
-#size_ref = 2
-#with XDMFFile("mesh/fine.xdmf") as infile:
-#    infile.read(mesh)
-size_ref = 1
-with XDMFFile("mesh/coarse.xdmf") as infile:
+size_ref = 2
+with XDMFFile("mesh/fine.xdmf") as infile:
     infile.read(mesh)
+#size_ref = 1
+#with XDMFFile("mesh/coarse.xdmf") as infile:
+#    infile.read(mesh)
 h = mesh.hmax()
 #finir plus tard pour taille des mailles.
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
@@ -40,13 +40,13 @@ def upper_hole(x, on_boundary):
     x0 = 20e-3
     y0 = H/2-20e-3
     radius = 10e-3
-    return near((x[0]-x0)*(x[0]-x0)+(x[1]-y0)*(x[1]-y0), radius*radius) and on_boundary
+    return (x[0]-x0)*(x[0]-x0)+(x[1]-y0)*(x[1]-y0) < radius*radius and on_boundary
 
 def lower_hole(x, on_boundary):
     x0 = 20e-3
     y0 = -H/2+20e-3
     radius = 10e-3
-    return near((x[0]-x0)*(x[0]-x0)+(x[1]-y0)*(x[1]-y0), radius*radius) and on_boundary
+    return (x[0]-x0)*(x[0]-x0)+(x[1]-y0)*(x[1]-y0) < radius*radius and on_boundary
 
 bnd_facets.set_all(0)
 Upper_hole = AutoSubDomain(upper_hole)
@@ -141,7 +141,7 @@ for c in cells_with_cracked_facet:
 A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
-dt = 1e-5
+dt = 1e-6 #1e-5
 print('dt: %.5e' % dt)
 T = 0.6e-3
 u_D.t = 0

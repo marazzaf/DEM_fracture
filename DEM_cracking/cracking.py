@@ -356,6 +356,7 @@ def energy_release_rate_vertex_bis(problem, broken_vertices, broken_facets, vec_
                         elif problem.d == 2:
                             Gh = np.pi*0.5*abs(np.dot(np.dot(stress[c1]+stress[c2],normal), jumps[fp])) #Plane elasticity
                         Gh_v = max(Gh_v, Gh)
+
         assert Gh_v > 0 #otherwise problem
         res[v] = Gh_v
 

@@ -10,28 +10,29 @@ parameters["form_compiler"]["cpp_optimize"] = True
 parameters["form_compiler"]["optimize"] = True
 
 # elastic parameters
-E = 3.09e9 
-nu = 0.35 
+E = 210e9 
+nu = 0.3
 mu    = Constant(E / (2.0*(1.0 + nu)))
 lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
 penalty = float(mu)
-Gc = 300
-k = 1. #loading speed
+Gc = 2.7e-3
+#k = 1.e-4 #loading speed
 
 #sample dimensions
-Ll, l0, H = 32e-3, 4e-3, 16e-3
+Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 
 #mesh
-#size_ref = 10 #20 #10 #5 #1 #debug
-#mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref*8, size_ref*4, "crossed")
+#size_ref = 40 #20 #10
+#mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
 #folder = 'structured'
 folder = 'unstructured'
+mesh = Mesh()
 size_ref = 2
-mesh = Mesh('mesh/plate_5_E_4.xml')
+with XDMFFile("mesh/fine.xdmf") as infile:
+    infile.read(mesh)
 #size_ref = 1
-#mesh = Mesh('mesh/plate_1_E_3.xml')
-#size_ref = 3
-#mesh = Mesh('mesh/plate_1_E_4.xml')
+#with XDMFFile("mesh/coarse.xdmf") as infile:
+#    infile.read(mesh)
 h = mesh.hmax()
 #finir plus tard pour taille des mailles.
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
@@ -60,14 +61,14 @@ U_CR = VectorFunctionSpace(mesh, 'CR', 1) #Pour interpollation dans les faces
 v_CR = TestFunction(U_CR)
 
 #new for BC
-l4 = v_CR('+')[1] / hF * (ds(41) + ds(42)) #mode 1
-#a4 = inner(v_CR('+'),as_vector((1.,1.))) / hF * (ds(41) + ds(42)) #mode mixte
-#a4 = v_CR('+')[0] / hF * (ds(41) + ds(42)) #mode 2
+#l4 = v_CR('+')[1] / hF * (ds(41) + ds(42)) #mode 1
+l4 = inner(v_CR('+'),as_vector((1.,1.))) / hF * (ds(41) + ds(42)) #mode mixte
+#l4 = v_CR('+')[0] / hF * (ds(41) + ds(42)) #mode 2
 L4 = assemble(l4)
 vec_BC = L4.get_local()
 nz = vec_BC.nonzero()
 #vec_BC[nz[0]+1] = 1. #pour bloquer déplacement solide rigide
-vec_BC[nz[0]-1] = 1. #pour bloquer déplacement solide rigide
+#vec_BC[nz[0]-1] = 1. #pour bloquer déplacement solide rigide
 nz_vec_BC = list(vec_BC.nonzero()[0])
 nz_vec_BC = set(nz_vec_BC)
 
@@ -76,7 +77,7 @@ problem = DEMProblem(mesh, d, penalty, nz_vec_BC, mu)
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)
-u_D = Expression(('0.', 'x[1]/fabs(x[1]) * k * t * H'), H=H, k=k, t=0, degree=1)
+u_D = Expression(('x[1] > 0 ? t : 0', '0'), t=0, degree=1)
 
 #Load and non-homogeneous Dirichlet BC
 def eps(v): #v is a gradient matrix
@@ -143,14 +144,14 @@ A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 chi = 1
-dt = h
+dt = 1e-4 #h
 print('dt: %.5e' % dt)
 T = 1. #100 * dt
 u_D.t = 0
 
 while u_D.t < T:
     u_D.t += dt
-    print('BC disp: %.5e' % (k * u_D.t))
+    print('BC disp: %.5e' % (u_D.t))
     inverting = True
 
     #interpolation of Dirichlet BC

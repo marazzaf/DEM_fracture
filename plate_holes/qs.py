@@ -10,13 +10,12 @@ parameters["form_compiler"]["cpp_optimize"] = True
 parameters["form_compiler"]["optimize"] = True
 
 # elastic parameters
-E = 210e9 
-nu = 0.3
+E = 6e9 
+nu = 0.22
 mu    = Constant(E / (2.0*(1.0 + nu)))
 lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
 penalty = float(mu)
-Gc = 2.7e-3
-#k = 1.e-4 #loading speed
+Gc = 2.28e-3
 
 #sample dimensions
 Ll, l0, H = 65e-3, 10e-3, 120e-3
@@ -37,17 +36,23 @@ bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 d = 2 #vectorial case 
 
 # Sub domain for BC
-def top(x, on_boundary):
-    return near(x[1], H/2) and on_boundary
+def upper_hole(x, on_boundary):
+    x0 = 20e-3
+    y0 = H/2-20e-3
+    radius = 10e-3
+    return near((x[0]-x0)*(x[0]-x0)+(x[1]-y0)*(x[1]-y0), radius*radius) and on_boundary
 
-def down(x, on_boundary):
-    return near(x[1], -H/2) and on_boundary
+def lower_hole(x, on_boundary):
+    x0 = 20e-3
+    y0 = -H/2+20e-3
+    radius = 10e-3
+    return near((x[0]-x0)*(x[0]-x0)+(x[1]-y0)*(x[1]-y0), radius*radius) and on_boundary
 
 bnd_facets.set_all(0)
-traction_boundary_1 = AutoSubDomain(top)
-traction_boundary_1.mark(bnd_facets, 41)
-traction_boundary_2 = AutoSubDomain(down)
-traction_boundary_2.mark(bnd_facets, 42)
+Upper_hole = AutoSubDomain(upper_hole)
+Upper_hole.mark(bnd_facets, 41)
+Lower_hole = AutoSubDomain(lower_hole)
+Lower_hole.mark(bnd_facets, 42)
 ds = Measure('ds')(subdomain_data=bnd_facets)
 
 # Mesh-related functions
@@ -58,14 +63,10 @@ U_CR = VectorFunctionSpace(mesh, 'CR', 1) #Pour interpollation dans les faces
 v_CR = TestFunction(U_CR)
 
 #new for BC
-#l4 = v_CR('+')[1] / hF * (ds(41) + ds(42)) #mode 1
 l4 = inner(v_CR('+'),as_vector((1.,1.))) / hF * (ds(41) + ds(42)) #mode mixte
-#l4 = v_CR('+')[0] / hF * (ds(41) + ds(42)) #mode 2
 L4 = assemble(l4)
 vec_BC = L4.get_local()
 nz = vec_BC.nonzero()
-#vec_BC[nz[0]+1] = 1. #pour bloquer déplacement solide rigide
-#vec_BC[nz[0]-1] = 1. #pour bloquer déplacement solide rigide
 nz_vec_BC = list(vec_BC.nonzero()[0])
 nz_vec_BC = set(nz_vec_BC)
 
@@ -74,7 +75,7 @@ problem = DEMProblem(mesh, d, penalty, nz_vec_BC, mu)
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)
-u_D = Expression(('x[1] > 0 ? t : 0', '0'), t=0, degree=1)
+u_D = Expression(('0', 'x[1] > 0 ? t : 0'), t=0, degree=1)
 
 #Load and non-homogeneous Dirichlet BC
 def eps(v): #v is a gradient matrix
@@ -140,10 +141,9 @@ for c in cells_with_cracked_facet:
 A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
-chi = 1
-dt = 1e-6 #1e-4 #weird...
+dt = 1e-5
 print('dt: %.5e' % dt)
-T = 0.02e-3
+T = 0.6e-3
 u_D.t = 0
 
 while u_D.t < T:
@@ -184,38 +184,12 @@ while u_D.t < T:
         #sys.exit()
 
         cracking_facets = set()
-
-        ##Computing new Gh
-        #Gh = problem.energy_release_rates(vec_u_CR, cracked_facets, not_breakable_facets)
-        #
-        ##Potentially cracking facet with biggest Gh
-        #idx = np.argpartition(Gh, -20)[-20:] #is 20 enough?
-        #indices = idx[np.argsort((-Gh)[idx])]
-        #
-        ##Choosing which facet to break
-        #for f in indices:
-        #    if Gh[f] > Gc:
-        #        cracking_facets = {f}
-        #        c1,c2 = problem.facet_num.get(f)
-        #        cells_with_cracked_facet |= {c1,c2}
-        #        not_breakable_facets |= (problem.facets_cell.get(c1) | problem.facets_cell.get(c2))
-        #        broken_vertices |= set(problem.Graph[c1][c2]['vertices_ind'])
-        #        break #When we get a facet verifying the conditions, we stop the search and continue with the cracking process
-        #    else:
-        #        inverting = False
-
         #Computing Gh per vertex and then kinking criterion
         Gh_v = problem.energy_release_rate_vertex_bis(broken_vertices, cracked_facets, vec_u_CR, vec_u_DG)
 
         #Looking for facet with largest Gh
         idx = np.argpartition(Gh_v, -20)[-20:] #is 20 enough?
         indices = idx[np.argsort((-Gh_v)[idx])]
-        #print(indices)
-        #print(Gh_v[1631])
-        #print(problem.facets_vertex.get(1631))
-        #print(cracked_facets)
-        #print(set(problem.facets_vertex.get(1631)) & cracked_facets)
-        #print('stop')
 
         #Kinking to choose breaking facet
         for v in indices:

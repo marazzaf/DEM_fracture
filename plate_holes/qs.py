@@ -19,20 +19,17 @@ Gc = 2.7e-3
 #k = 1.e-4 #loading speed
 
 #sample dimensions
-Ll, l0, H = 1e-3, 0.5e-3, 1e-3
+Ll, l0, H = 65e-3, 10e-3, 120e-3
 
 #mesh
-#size_ref = 40 #20 #10
-#mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
-#folder = 'structured'
-folder = 'unstructured'
+folder = 'results'
 mesh = Mesh()
-size_ref = 2
-with XDMFFile("mesh/fine.xdmf") as infile:
-    infile.read(mesh)
-#size_ref = 1
-#with XDMFFile("mesh/coarse.xdmf") as infile:
+#size_ref = 2
+#with XDMFFile("mesh/fine.xdmf") as infile:
 #    infile.read(mesh)
+size_ref = 1
+with XDMFFile("mesh/coarse.xdmf") as infile:
+    infile.read(mesh)
 h = mesh.hmax()
 #finir plus tard pour taille des mailles.
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
@@ -114,7 +111,7 @@ broken_vertices = set()
 for (x,y) in problem.Graph.edges():
     f = problem.Graph[x][y]['dof_CR'][0] // d
     pos = problem.Graph[x][y]['barycentre']
-    if problem.Graph[x][y]['breakable'] and abs(pos[1]) < 1.e-15 and pos[0] < l0:
+    if problem.Graph[x][y]['breakable'] and abs(pos[1] - (H/2-55e-3)) < 1.e-15 and pos[0] < l0:
         cracking_facets.add(f)
         cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
         cells_with_cracked_facet |= {x,y}

@@ -2,7 +2,7 @@
 L = 65e-3; //Longeur selon x
 H = 120e-3; //Longuer selon y
 l0 = 10e-3; //Size initial crack
-h = 1e-3; //2e-3 //Taille du maillage
+h = 1.5e-3; //2e-3 //Taille du maillage
 
 //Plate
 Point(1) = {0,H/2,0,h};

@@ -22,14 +22,14 @@ k = 1. #loading speed
 Ll, l0, H = 32e-3, 4e-3, 16e-3
 
 #mesh
-size_ref = 10 #20 #10 #5 #1 #debug
-mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref*8, size_ref*4, "crossed")
-folder = 'structured'
+#size_ref = 10 #20 #10 #5 #1 #debug
+#mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref*8, size_ref*4, "crossed")
+#folder = 'structured'
 #folder = 'unstructured'
 #size_ref = 2
 #mesh = Mesh('mesh/plate_5_E_4.xml')
-#size_ref = 1
-#mesh = Mesh('mesh/plate_1_E_3.xml')
+size_ref = 1
+mesh = Mesh('mesh/plate_1_E_3.xml')
 #size_ref = 3
 #mesh = Mesh('mesh/plate_1_E_4.xml')
 h = mesh.hmax()

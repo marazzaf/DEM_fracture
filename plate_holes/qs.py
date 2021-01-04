@@ -1,6 +1,6 @@
 # coding: utf-8
 from dolfin import *
-from scipy.sparse.linalg import cg
+from scipy.sparse.linalg import cg,spsolve
 from DEM_cracking.DEM import *
 from DEM_cracking.miscellaneous import *
 from DEM_cracking.cracking import *
@@ -21,15 +21,15 @@ Gc = 2.28e-3
 Ll, l0, H = 65e-3, 10e-3, 120e-3
 
 #mesh
-folder = 'results'
+folder = 'test'
 mesh = Mesh()
-size_ref = 2
-with XDMFFile("mesh/fine.xdmf") as infile:
-    infile.read(mesh)
-#size_ref = 1
+size_ref = 3 #3 #2 #1
+with XDMFFile("mesh/very_fine.xdmf") as infile:
+#with XDMFFile("mesh/fine.xdmf") as infile:
 #with XDMFFile("mesh/coarse.xdmf") as infile:
-#    infile.read(mesh)
+    infile.read(mesh)
 h = mesh.hmax()
+print(h)
 #finir plus tard pour taille des mailles.
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 
@@ -72,6 +72,7 @@ nz_vec_BC = set(nz_vec_BC)
 
 #Creating the DEM problem
 problem = DEMProblem(mesh, d, penalty, nz_vec_BC, mu)
+print(problem.nb_dof_DEM)
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)
@@ -90,6 +91,8 @@ mat_elas = problem.elastic_bilinear_form(ref_elastic)
 
 #Stresses output
 problem.mat_stress = output_stress(problem, sigma, eps)
+problem.mat_strain = output_strain(problem, eps)
+
 #Facet jump output
 problem.mat_jump_bis = problem.mat_jump()
 
@@ -163,8 +166,9 @@ while u_D.t < T:
         #inverting system
         count += 1
         print('COUNT: %i' % count)
-        u_reduced,info = cg(A_not_D, L_not_D)
-        assert(info == 0)
+        #u_reduced,info = cg(A_not_D, L_not_D)
+        u_reduced = spsolve(A_not_D, L_not_D)
+        #assert(info == 0)
         u = problem.complete_solution(u_reduced,u_D)
 
         #Post-processing
@@ -194,7 +198,7 @@ while u_D.t < T:
         #Kinking to choose breaking facet
         for v in indices:
             if Gh_v[v] > Gc:
-                f = K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets,cracked_facets)
+                f = test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets,cracked_facets)
                 if f != None:
                     cracking_facets = {f}
                     c1,c2 = problem.facet_num.get(f)

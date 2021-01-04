@@ -87,9 +87,21 @@ def output_stress(problem, sigma=grad, eps=grad):
     Du_DG = TrialFunction(problem.W)
     Dv_DG = TestFunction(problem.W)
     
-    a47 = inner(sigma(eps(Du_DG)), Dv_DG) / vol * dx
-    A47 = assemble(a47)
-    row,col,val = as_backend_type(A47).mat().getValuesCSR()
+    a = inner(sigma(eps(Du_DG)), Dv_DG) / vol * dx
+    A = assemble(a)
+    row,col,val = as_backend_type(A).mat().getValuesCSR()
+    mat_stress = csr_matrix((val, col, row))
+    
+    return mat_stress
+
+def output_strain(problem, eps=grad):
+    vol = CellVolume(problem.mesh)
+    Du_DG = TrialFunction(problem.W)
+    Dv_DG = TestFunction(problem.W)
+    
+    a = inner(eps(Du_DG), Dv_DG) / vol * dx
+    A = assemble(a)
+    row,col,val = as_backend_type(A).mat().getValuesCSR()
     mat_stress = csr_matrix((val, col, row))
     
     return mat_stress

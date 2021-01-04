@@ -27,13 +27,14 @@ Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 #folder = 'structured'
 folder = 'unstructured'
 mesh = Mesh()
-size_ref = 2
-with XDMFFile("mesh/fine.xdmf") as infile:
-    infile.read(mesh)
-#size_ref = 1
-#with XDMFFile("mesh/coarse.xdmf") as infile:
+#size_ref = 2
+#with XDMFFile("mesh/fine.xdmf") as infile:
 #    infile.read(mesh)
+size_ref = 1
+with XDMFFile("mesh/coarse.xdmf") as infile:
+    infile.read(mesh)
 h = mesh.hmax()
+print(h)
 #finir plus tard pour taille des mailles.
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 
@@ -74,6 +75,8 @@ nz_vec_BC = set(nz_vec_BC)
 
 #Creating the DEM problem
 problem = DEMProblem(mesh, d, penalty, nz_vec_BC, mu)
+print(problem.nb_dof_DEM)
+sys.exit()
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)

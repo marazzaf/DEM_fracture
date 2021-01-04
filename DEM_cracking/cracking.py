@@ -436,3 +436,27 @@ def mat_jump(problem):
     A = assemble(a)
     row,col,val = as_backend_type(A).mat().getValuesCSR()
     return csr_matrix((val, col, row), shape=(problem.initial_nb_dof_CR, problem.nb_dof_cells))
+
+def test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets, broken_facets):
+    #To get stresses in cells
+    stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
+    stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.d, problem.dim)))
+
+    strains = problem.mat_strain * problem.mat_grad * vec_u_CR
+    strain = np.nan_to_num(strains.reshape((problem.nb_dof_cells // problem.d, problem.d, problem.dim)))
+
+    breakable_facets = list(set(problem.facets_vertex.get(v)) - not_breakable_facets)
+    if len(breakable_facets) > 0: #otherwise no facet can be broken
+        list_dens = []
+
+        for fp in breakable_facets:
+            c1,c2 = problem.facet_num.get(fp)
+            assert problem.d == 2
+            facet_stress = 0.5*(stress[c1]+stress[c2])
+            facet_strain = 0.5*(strain[c1]+strain[c2])
+            dens = 0.5 * np.tensordot(facet_stress,facet_strain)
+            list_dens.append(dens)
+            
+        return breakable_facets[np.argmax(np.array(list_dens))]
+    else:
+        return 

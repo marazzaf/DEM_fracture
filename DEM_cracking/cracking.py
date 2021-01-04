@@ -440,12 +440,13 @@ def mat_jump(problem):
 def mat_normal_jump(problem):
     n = FacetNormal(problem.mesh)
     S = FacetArea(problem.mesh)
-    v_CR = TestFunction(problem.CR)
+    CR = FunctionSpace(problem.mesh, 'CR', 1)
+    v_CR = TestFunction(CR)
     u_DG = TrialFunction(problem.DG_0)
     a = inner(jump(u_DG,n), v_CR('+')) / S('+') * dS
     A = assemble(a)
     row,col,val = as_backend_type(A).mat().getValuesCSR()
-    return csr_matrix((val, col, row), shape=(problem.initial_nb_dof_CR, problem.nb_dof_cells))
+    return csr_matrix((val, col, row))
 
 def test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets, broken_facets, vec_u_DG):
 
@@ -471,7 +472,9 @@ def test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets, broken_fa
                 facet_strain = 0.5*(strain[c1]+strain[c2])
                 dens = 0.5 * np.tensordot(facet_stress,facet_strain)
                 list_dens.append(dens)
-            
-        return breakable_facets[np.argmax(np.array(list_dens))]
+        if len(list_dens) > 0:    
+            return breakable_facets[np.argmax(np.array(list_dens))]
+        else:
+            return
     else:
         return 

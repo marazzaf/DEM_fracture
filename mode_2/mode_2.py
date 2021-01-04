@@ -79,7 +79,7 @@ print(problem.nb_dof_DEM)
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)
-u_D = Expression(('x[1] > 0 ? t : 0', '0'), t=0, degree=1)
+u_D = Expression(('x[1] > 0 ? -t : 0', '0'), t=0, degree=1)
 
 #Load and non-homogeneous Dirichlet BC
 def eps(v): #v is a gradient matrix
@@ -97,7 +97,7 @@ problem.mat_stress = output_stress(problem, sigma, eps)
 problem.mat_strain = output_strain(problem, eps)
 #Facet jump output
 problem.mat_jump_bis = problem.mat_jump()
-problem.mat_jump_normal = problem.mat_normal_jump()
+problem.mat_jump_normal = mat_normal_jump(problem)
 
 #useful
 solution_u_DG = Function(problem.DG_0,  name="disp DG")

@@ -1,6 +1,6 @@
 # coding: utf-8
 from dolfin import *
-from scipy.sparse.linalg import cg
+from scipy.sparse.linalg import spsolve
 from DEM_cracking.DEM import *
 from DEM_cracking.miscellaneous import *
 from DEM_cracking.cracking import *
@@ -22,17 +22,17 @@ Gc = 2.7e-3
 Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 
 #mesh
-#size_ref = 40 #20 #10
-#mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
-#folder = 'structured'
-folder = 'unstructured'
-mesh = Mesh()
+size_ref = 20 #20 #10
+mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
+folder = 'structured'
+#folder = 'unstructured'
+#mesh = Mesh()
 #size_ref = 2
 #with XDMFFile("mesh/fine.xdmf") as infile:
 #    infile.read(mesh)
-size_ref = 1
-with XDMFFile("mesh/coarse.xdmf") as infile:
-    infile.read(mesh)
+#size_ref = 1
+#with XDMFFile("mesh/coarse.xdmf") as infile:
+#    infile.read(mesh)
 h = mesh.hmax()
 print(h)
 #finir plus tard pour taille des mailles.
@@ -76,7 +76,6 @@ nz_vec_BC = set(nz_vec_BC)
 #Creating the DEM problem
 problem = DEMProblem(mesh, d, penalty, nz_vec_BC, mu)
 print(problem.nb_dof_DEM)
-sys.exit()
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)
@@ -95,8 +94,10 @@ mat_elas = problem.elastic_bilinear_form(ref_elastic)
 
 #Stresses output
 problem.mat_stress = output_stress(problem, sigma, eps)
+problem.mat_strain = output_strain(problem, eps)
 #Facet jump output
 problem.mat_jump_bis = problem.mat_jump()
+problem.mat_jump_normal = problem.mat_normal_jump()
 
 #useful
 solution_u_DG = Function(problem.DG_0,  name="disp DG")
@@ -169,8 +170,9 @@ while u_D.t < T:
         #inverting system
         count += 1
         print('COUNT: %i' % count)
-        u_reduced,info = cg(A_not_D, L_not_D)
-        assert(info == 0)
+        u_reduced = spsolve(A_not_D, L_not_D)
+        #u_reduced,info = cg(A_not_D, L_not_D)
+        #assert(info == 0)
         u = problem.complete_solution(u_reduced,u_D)
 
         #Post-processing
@@ -226,7 +228,7 @@ while u_D.t < T:
         #Kinking to choose breaking facet
         for v in indices:
             if Gh_v[v] > Gc:
-                f = K2_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets,cracked_facets)
+                f = test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets,cracked_facets, vec_u_DG)
                 if f != None:
                     cracking_facets = {f}
                     c1,c2 = problem.facet_num.get(f)

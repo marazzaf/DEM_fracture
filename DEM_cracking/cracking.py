@@ -437,7 +437,21 @@ def mat_jump(problem):
     row,col,val = as_backend_type(A).mat().getValuesCSR()
     return csr_matrix((val, col, row), shape=(problem.initial_nb_dof_CR, problem.nb_dof_cells))
 
-def test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets, broken_facets):
+def mat_normal_jump(problem):
+    n = FacetNormal(problem.mesh)
+    S = FacetArea(problem.mesh)
+    v_CR = TestFunction(problem.CR)
+    u_DG = TrialFunction(problem.DG_0)
+    a = inner(jump(u_DG,n), v_CR('+')) / S('+') * dS
+    A = assemble(a)
+    row,col,val = as_backend_type(A).mat().getValuesCSR()
+    return csr_matrix((val, col, row), shape=(problem.initial_nb_dof_CR, problem.nb_dof_cells))
+
+def test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets, broken_facets, vec_u_DG):
+
+    #normal jump
+    normal_jump = problem.mat_jump_normal * vec_u_DG
+    
     #To get stresses in cells
     stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
     stress = np.nan_to_num(stresses.reshape((problem.nb_dof_cells // problem.d, problem.d, problem.dim)))
@@ -450,12 +464,13 @@ def test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets, broken_fa
         list_dens = []
 
         for fp in breakable_facets:
-            c1,c2 = problem.facet_num.get(fp)
-            assert problem.d == 2
-            facet_stress = 0.5*(stress[c1]+stress[c2])
-            facet_strain = 0.5*(strain[c1]+strain[c2])
-            dens = 0.5 * np.tensordot(facet_stress,facet_strain)
-            list_dens.append(dens)
+            if normal_jump[fp] > 0: #otherwise facet is in compression
+                c1,c2 = problem.facet_num.get(fp)
+                assert problem.d == 2
+                facet_stress = 0.5*(stress[c1]+stress[c2])
+                facet_strain = 0.5*(strain[c1]+strain[c2])
+                dens = 0.5 * np.tensordot(facet_stress,facet_strain)
+                list_dens.append(dens)
             
         return breakable_facets[np.argmax(np.array(list_dens))]
     else:

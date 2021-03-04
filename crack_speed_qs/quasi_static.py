@@ -13,12 +13,12 @@ parameters["form_compiler"]["optimize"] = True
 
 # elastic parameters
 mu = 0.2
-penalty = mu
+penalty = 2*mu
 Gc = 0.01
-k = 1.e-3 #loading speed...
+k = 1#loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 10 #80 #40 #20 #10
+size_ref = 20 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -88,7 +88,7 @@ f_CR = TestFunction(U_CR)
 areas = assemble(f_CR('+') * (dS + ds)).get_local() #For crack speeds
 
 #length crack output
-folder = 'dt_0_1'
+folder = 'du_3'
 length_crack = open(folder+'/length_crack_%i.txt' % size_ref, 'w')
 
 count_output_crack = 0
@@ -135,7 +135,7 @@ T = 1. / k
 u_D.t = 0.2 / k #il ne se passe rien avant...
 chi = 1 #450 #45 #4.5 #0.45
 #dt = h / (chi*k)
-dt = 1e-1 / k
+dt = 1e-3 / k
 print('chi: %.5e' % chi)
 print('Delta u_D: %.5e' % (dt*k))
 

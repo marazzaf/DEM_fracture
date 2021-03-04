@@ -5,8 +5,7 @@ import scipy.stats as st
 
 size_ref = 20
 
-#values = np.loadtxt('dt_0_0_1/length_crack_%i.txt' % size_ref)
-values = np.loadtxt('dt_1_E_3/length_crack_%i.txt' % size_ref)
+values = np.loadtxt('du_3/length_crack_%i.txt' % size_ref)
 
 mu = 0.2
 H = 1

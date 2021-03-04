@@ -15,7 +15,7 @@ parameters["form_compiler"]["optimize"] = True
 
 # elastic parameters
 mu = 0.2
-penalty = mu
+penalty = 2*mu
 
 #geometry
 a, R, l0 = 0.5, 0.025, 0.025

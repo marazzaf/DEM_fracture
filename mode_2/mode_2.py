@@ -22,17 +22,20 @@ Gc = 2.7e-3
 Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 
 #mesh
-size_ref = 20 #20 #10
-mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
-folder = 'structured'
-#folder = 'unstructured'
-#mesh = Mesh()
+#size_ref = 40 #20 #10
+#mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
+#folder = 'structured'
+folder = 'unstructured'
+mesh = Mesh()
 #size_ref = 2
 #with XDMFFile("mesh/fine.xdmf") as infile:
 #    infile.read(mesh)
 #size_ref = 1
 #with XDMFFile("mesh/coarse.xdmf") as infile:
 #    infile.read(mesh)
+size_ref = 3
+with XDMFFile("mesh/very_fine.xdmf") as infile:
+    infile.read(mesh)
 h = mesh.hmax()
 print(h)
 #finir plus tard pour taille des mailles.
@@ -76,6 +79,7 @@ nz_vec_BC = set(nz_vec_BC)
 #Creating the DEM problem
 problem = DEMProblem(mesh, d, penalty, nz_vec_BC, mu)
 print(problem.nb_dof_DEM)
+sys.exit()
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)

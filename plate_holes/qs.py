@@ -73,6 +73,7 @@ nz_vec_BC = set(nz_vec_BC)
 #Creating the DEM problem
 problem = DEMProblem(mesh, d, penalty, nz_vec_BC, mu)
 print(problem.nb_dof_DEM)
+sys.exit()
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)

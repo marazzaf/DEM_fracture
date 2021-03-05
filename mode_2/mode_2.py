@@ -22,7 +22,7 @@ Gc = 2.7e-3
 Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 
 #mesh
-size_ref = 80 #40 #20 #10
+size_ref = 10 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
 folder = 'structured'
 #folder = 'unstructured'
@@ -176,9 +176,13 @@ while u_D.t < T:
         #inverting system
         count += 1
         print('COUNT: %i' % count)
-        u_reduced = spsolve(A_not_D, L_not_D)
-        #u_reduced,info = cg(A_not_D, L_not_D)
-        #assert(info == 0)
+
+        #old solve
+        #u_reduced = spsolve(A_not_D, L_not_D)
+
+        #test new solve
+        u_reduced = Solve(to_PETScMat(A_not_D), to_PETScVec(L_not_D))
+        #Getting solution with BC interpolation
         u = problem.complete_solution(u_reduced,u_D)
 
         #Post-processing

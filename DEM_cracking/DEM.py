@@ -5,6 +5,7 @@ import numpy as np
 from DEM_cracking.mesh_related import *
 from DEM_cracking.reconstructions import *
 from DEM_cracking.miscellaneous import *
+from petsc4py import PETSc
 
 class DEMProblem:
     """ Class that will contain the basics of a DEM problem from the mesh and the dimension of the problem to reconstrucion matrices and gradient matrix."""
@@ -195,3 +196,29 @@ def removing_penalty(problem, cracking_facets):
                     mat_jump_2[dof_CR,tens_dof_position[(num % d_)*d_ + i]] = sign*pen_diff[i]
 
     return mat_jump_1.tocsr(), mat_jump_2.tocsr()
+
+def to_PETScMat(mat):
+    lhs = mat.tocsr()
+    petsc_mat = PETSc.Mat().createAIJ(size=lhs.shape, csr=(lhs.indptr, lhs.indices,lhs.data))
+    return petsc_mat
+
+def to_PETScVec(rhs):
+    return PETSc.Vec().createWithArray(rhs)
+
+def Solve(A, b):
+    #creating linear solver
+    ksp = PETSc.KSP().create()
+    ksp.setOperators(A)
+
+    #use CG and ICC
+    ksp.setType('cg')
+    ksp.getPC().setType('icc')
+    
+    # obtain sol & rhs vectors
+    x, c = A.getVecs()
+    x.set(0)
+
+    # and next solve
+    ksp.setFromOptions()
+    ksp.solve(b, x)
+    return x.getArray()

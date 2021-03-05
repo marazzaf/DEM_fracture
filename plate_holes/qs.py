@@ -103,6 +103,7 @@ solution_stress = Function(problem.W, name="Stress")
 
 #For outputs
 file = File('%s/test_%i_.pvd' % (folder,size_ref))
+ld = open('%s/ld_%i.txt' % (folder,size_ref), 'w')
 
 count_output_crack = 1
 cracked_facet_vertices = []
@@ -167,10 +168,7 @@ while u_D.t < T:
         #inverting system
         count += 1
         print('COUNT: %i' % count)
-        #u_reduced,info = cg(A_not_D, L_not_D)
-        u_reduced = spsolve(A_not_D, L_not_D)
-        #assert(info == 0)
-        u = problem.complete_solution(u_reduced,u_D)
+        u_reduced = Solve(to_PETScMat(A_not_D), to_PETScVec(L_not_D))
 
         #Post-processing
         vec_u_CR = problem.DEM_to_CR * u
@@ -178,15 +176,12 @@ while u_D.t < T:
         stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
         stress_per_cell = stresses.reshape((problem.nb_dof_cells // problem.d,problem.dim,problem.dim))
 
-        ##outputs sometimes
-        #if u_D.t % (T / 10) < dt:
-        #solution_u_DG.vector().set_local(vec_u_DG)
-        #solution_u_DG.vector().apply("insert")
-        #file.write(solution_u_DG, u_D.t)
-        #solution_stress.vector().set_local(stresses)
-        #solution_stress.vector().apply("insert")
-        #file.write(solution_stress, u_D.t)
-        #sys.exit()
+        #Computing load displacement curve
+        if count == 1:
+            solution_stress.vector().set_local(stresses)
+            solution_stress.vector().apply("insert")
+            load = inner(dot(solution_stress, n), as_vector((0,1))) * ds(41)
+            ld.write('%.5e %.5e\n' % (u_D.t, assemble(load)))
 
         cracking_facets = set()
         #Computing Gh per vertex and then kinking criterion
@@ -248,3 +243,4 @@ while u_D.t < T:
             cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
 
 print('End of computation !')
+ld.close()

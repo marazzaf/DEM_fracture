@@ -22,7 +22,7 @@ Gc = 2.7e-3
 Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 
 #mesh
-size_ref = 10 #80 #40 #20 #10
+size_ref = 80 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
 folder = 'structured'
 #folder = 'unstructured'

@@ -1,6 +1,5 @@
 # coding: utf-8
 from dolfin import *
-from scipy.sparse.linalg import cg,spsolve
 from DEM_cracking.DEM import *
 from DEM_cracking.miscellaneous import *
 from DEM_cracking.cracking import *
@@ -15,7 +14,7 @@ nu = 0.22
 mu    = Constant(E / (2.0*(1.0 + nu)))
 lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
 penalty = float(mu)
-Gc = 2.28e-3
+Gc = 2.28e3
 
 #sample dimensions
 Ll, l0, H = 65e-3, 10e-3, 120e-3
@@ -23,9 +22,9 @@ Ll, l0, H = 65e-3, 10e-3, 120e-3
 #mesh
 folder = 'test'
 mesh = Mesh()
-size_ref = 3 #3 #2 #1
-with XDMFFile("mesh/very_fine.xdmf") as infile:
-#with XDMFFile("mesh/fine.xdmf") as infile:
+size_ref = 2 #3 #2 #1
+#with XDMFFile("mesh/very_fine.xdmf") as infile:
+with XDMFFile("mesh/fine.xdmf") as infile:
 #with XDMFFile("mesh/coarse.xdmf") as infile:
     infile.read(mesh)
 h = mesh.hmax()
@@ -57,6 +56,7 @@ ds = Measure('ds')(subdomain_data=bnd_facets)
 
 # Mesh-related functions
 hF = FacetArea(mesh)
+n = FacetNormal(mesh)
 
 #Function spaces
 U_CR = VectorFunctionSpace(mesh, 'CR', 1) #Pour interpollation dans les faces
@@ -73,7 +73,7 @@ nz_vec_BC = set(nz_vec_BC)
 #Creating the DEM problem
 problem = DEMProblem(mesh, d, penalty, nz_vec_BC, mu)
 print(problem.nb_dof_DEM)
-sys.exit()
+#sys.exit()
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)
@@ -96,6 +96,7 @@ problem.mat_strain = output_strain(problem, eps)
 
 #Facet jump output
 problem.mat_jump_bis = problem.mat_jump()
+problem.mat_jump_normal = mat_normal_jump(problem)
 
 #useful
 solution_u_DG = Function(problem.DG_0,  name="disp DG")
@@ -146,7 +147,7 @@ for c in cells_with_cracked_facet:
 A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
-dt = 1e-6 #1e-5
+dt = 1e-5 #1e-5
 print('dt: %.5e' % dt)
 T = 0.6e-3
 u_D.t = 0
@@ -169,6 +170,8 @@ while u_D.t < T:
         count += 1
         print('COUNT: %i' % count)
         u_reduced = Solve(to_PETScMat(A_not_D), to_PETScVec(L_not_D))
+        #Getting solution with BC interpolation
+        u = problem.complete_solution(u_reduced,u_D)
 
         #Post-processing
         vec_u_CR = problem.DEM_to_CR * u
@@ -194,7 +197,7 @@ while u_D.t < T:
         #Kinking to choose breaking facet
         for v in indices:
             if Gh_v[v] > Gc:
-                f = test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets,cracked_facets)
+                f = test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets,cracked_facets, vec_u_DG)
                 if f != None:
                     cracking_facets = {f}
                     c1,c2 = problem.facet_num.get(f)

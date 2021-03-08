@@ -22,20 +22,20 @@ Gc = 2.7e3 #2700?
 Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 
 #mesh
-size_ref = 80 #80 #40 #20 #10
-mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
-folder = 'structured'
-#folder = 'unstructured'
-#mesh = Mesh()
+#size_ref = 100 #80 #40 #20 #10
+#mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
+#folder = 'structured'
+folder = 'unstructured'
+mesh = Mesh()
 #size_ref = 2
 #with XDMFFile("mesh/fine.xdmf") as infile:
 #    infile.read(mesh)
 #size_ref = 1
 #with XDMFFile("mesh/coarse.xdmf") as infile:
 #    infile.read(mesh)
-#size_ref = 3
-#with XDMFFile("mesh/very_fine.xdmf") as infile:
-#    infile.read(mesh)
+size_ref = 3
+with XDMFFile("mesh/very_fine.xdmf") as infile:
+    infile.read(mesh)
 h = mesh.hmax()
 print(h)
 #finir plus tard pour taille des mailles.
@@ -159,7 +159,7 @@ A_not_D,B = problem.schur_complement(A)
 chi = 1
 dt = 1e-7 #1e-8 #ref
 print('dt: %.5e' % dt)
-T = 0.02e-3
+T = 0.1e-3 #0.02e-3 #max in theory
 u_D.t = 0
 
 while u_D.t < T:

@@ -207,7 +207,12 @@ while u_D.t < T:
             solution_stress.vector().set_local(stresses)
             solution_stress.vector().apply("insert")
             load = -inner(dot(solution_stress, n), as_vector((1,0))) * ds(41) #change that for the consistent version!!!
-            ld.write('%.5e %.5e\n' % (u_D.t, assemble(load)))
+            
+
+            #jeremy
+            v = interpolate(Constant((1,0)), U_CR)
+            load_test = np.dot(A*v.get_local() - L, v.get_local())
+            ld.write('%.5e %.5e %.5e\n' % (u_D.t, assemble(load), load_test))
 
         cracking_facets = set()
 

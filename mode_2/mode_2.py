@@ -206,7 +206,7 @@ while u_D.t < T:
         if count == 1:
             solution_stress.vector().set_local(stresses)
             solution_stress.vector().apply("insert")
-            load = -inner(dot(solution_stress, n), as_vector((1,0))) * ds(41)
+            load = -inner(dot(solution_stress, n), as_vector((1,0))) * ds(41) #change that for the consistent version!!!
             ld.write('%.5e %.5e\n' % (u_D.t, assemble(load)))
 
         cracking_facets = set()

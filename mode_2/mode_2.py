@@ -30,12 +30,12 @@ mesh = Mesh()
 #size_ref = 2
 #with XDMFFile("mesh/fine.xdmf") as infile:
 #    infile.read(mesh)
-size_ref = 1
-with XDMFFile("mesh/coarse.xdmf") as infile:
-    infile.read(mesh)
-#size_ref = 3
-#with XDMFFile("mesh/very_fine.xdmf") as infile:
+#size_ref = 1
+#with XDMFFile("mesh/coarse.xdmf") as infile:
 #    infile.read(mesh)
+size_ref = 3
+with XDMFFile("mesh/very_fine.xdmf") as infile:
+    infile.read(mesh)
 h = mesh.hmax()
 print(h)
 #finir plus tard pour taille des mailles.

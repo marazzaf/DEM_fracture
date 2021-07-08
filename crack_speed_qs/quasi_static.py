@@ -15,10 +15,10 @@ parameters["form_compiler"]["optimize"] = True
 mu = 0.2
 penalty = 2*mu
 Gc = 0.01
-k = 1#loading speed...
+k = 1 #loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 2 #80 #40 #20 #10
+size_ref = 20 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -160,17 +160,11 @@ while u_D.t < T:
         print('COUNT: %i' % count)
         u_reduced,info = cg(A_not_D, L_not_D)
         #u_reduced = spsolve(A_not_D, L_not_D)
-        #assert(info == 0)
+        assert(info == 0)
         u = problem.complete_solution(u_reduced,u_D)
-        print(local_project(u_D, problem.CR).vector().get_local())
-        sys.exit()
 
         #test
-        print(A*u)
-        print(u)
         elas = 0.5*np.dot(A*u, u)
-        print(elas)
-        sys.exit()
         elastic_en.write('%.5e %.5e\n' % (k * u_D.t, elas))
 
         #Post-processing

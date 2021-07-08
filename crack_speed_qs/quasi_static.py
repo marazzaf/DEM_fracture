@@ -2,7 +2,7 @@
 import sys
 from dolfin import *
 import matplotlib.pyplot as plt
-from scipy.sparse.linalg import cg
+from scipy.sparse.linalg import cg,spsolve
 from DEM_cracking.DEM import *
 from DEM_cracking.miscellaneous import *
 from DEM_cracking.cracking import *
@@ -18,7 +18,7 @@ Gc = 0.01
 k = 1#loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 40 #80 #40 #20 #10
+size_ref = 2 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -82,7 +82,7 @@ solution_stress = Function(problem.W, name="Stress")
 #reference solution
 x = SpatialCoordinate(mesh)
 #Dirichlet BC
-u_D = Expression('x[1]/fabs(x[1]) * k * t * (1 - x[0]/L)', L=Ll, k=k, t=0, degree=2)
+u_D = Expression('x[1]>0 ? k * t * (1 - x[0]/L) : -k * t * (1 - x[0]/L)', L=Ll, k=k, t=0, degree=2)
 
 f_CR = TestFunction(U_CR)
 areas = assemble(f_CR('+') * (dS + ds)).get_local() #For crack speeds
@@ -159,11 +159,18 @@ while u_D.t < T:
         count += 1
         print('COUNT: %i' % count)
         u_reduced,info = cg(A_not_D, L_not_D)
-        assert(info == 0)
+        #u_reduced = spsolve(A_not_D, L_not_D)
+        #assert(info == 0)
         u = problem.complete_solution(u_reduced,u_D)
+        print(local_project(u_D, problem.CR).vector().get_local())
+        sys.exit()
 
         #test
+        print(A*u)
+        print(u)
         elas = 0.5*np.dot(A*u, u)
+        print(elas)
+        sys.exit()
         elastic_en.write('%.5e %.5e\n' % (k * u_D.t, elas))
 
         #Post-processing

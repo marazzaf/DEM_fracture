@@ -18,7 +18,7 @@ Gc = 0.01
 k = 1#loading speed...
 
 Ll, l0, H = 5., 1., 1.
-size_ref = 20 #80 #40 #20 #10
+size_ref = 80 #80 #40 #20 #10
 mesh = RectangleMesh(Point(0, H), Point(Ll, -H), size_ref*5, 2*size_ref, "crossed")
 bnd_facets = MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
 h = H / size_ref
@@ -88,8 +88,9 @@ f_CR = TestFunction(U_CR)
 areas = assemble(f_CR('+') * (dS + ds)).get_local() #For crack speeds
 
 #length crack output
-folder = 'du_3'
-length_crack = open(folder+'/length_crack_%i.txt' % size_ref, 'w')
+folder = 'elastic_en'
+length_crack = open(folder+'/length_crack_%i.txt' % size_ref, 'w', 1)
+elastic_en = open(folder+'/elastic_energy_%i.txt' % size_ref, 'w', 1)
 
 count_output_crack = 0
 cracked_facet_vertices = []
@@ -160,6 +161,10 @@ while u_D.t < T:
         u_reduced,info = cg(A_not_D, L_not_D)
         assert(info == 0)
         u = problem.complete_solution(u_reduced,u_D)
+
+        #test
+        elas = 0.5*np.dot(A*u, u)
+        elastic_en.write('%.5e %.5e\n' % (k * u_D.t, elas))
 
         #Post-processing
         vec_u_CR = problem.DEM_to_CR * u
@@ -253,5 +258,6 @@ while u_D.t < T:
 
 #computation over
 length_crack.close()
+elastic_en.close()
 print('End of computation !')
 

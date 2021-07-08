@@ -204,12 +204,14 @@ while u_D.t < T:
 
         #Computing load displacement curve
         if count == 1:
-            solution_stress.vector().set_local(stresses)
-            solution_stress.vector().apply("insert")
-            load = -inner(dot(solution_stress, n), as_vector((1,0))) * ds(41)
-            #consistent forces
+            #solution_stress.vector().set_local(stresses)
+            #solution_stress.vector().apply("insert")
+            load = inner(dot(solution_stress, n), as_vector((1,0))) * ds(43) #change that for the consistent version!!!
+            
+
+            #jeremy
             v = problem.trace_matrix.T * interpolate(Constant((1,0)), U_CR).vector().get_local()
-            load_test = np.dot(u, A*v)
+            load_test = np.dot(A*u - problem.trace_matrix.T * L[:problem.initial_nb_dof_CR], v)
             ld.write('%.5e %.5e %.5e\n' % (u_D.t, assemble(load), load_test))
 
         cracking_facets = set()

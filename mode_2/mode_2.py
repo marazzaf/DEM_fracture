@@ -30,12 +30,12 @@ mesh = Mesh()
 #size_ref = 2
 #with XDMFFile("mesh/fine.xdmf") as infile:
 #    infile.read(mesh)
-#size_ref = 1
-#with XDMFFile("mesh/coarse.xdmf") as infile:
-#    infile.read(mesh)
-size_ref = 3
-with XDMFFile("mesh/very_fine.xdmf") as infile:
+size_ref = 1
+with XDMFFile("mesh/coarse.xdmf") as infile:
     infile.read(mesh)
+#size_ref = 3
+#with XDMFFile("mesh/very_fine.xdmf") as infile:
+#    infile.read(mesh)
 h = mesh.hmax()
 print(h)
 #finir plus tard pour taille des mailles.
@@ -207,7 +207,10 @@ while u_D.t < T:
             solution_stress.vector().set_local(stresses)
             solution_stress.vector().apply("insert")
             load = -inner(dot(solution_stress, n), as_vector((1,0))) * ds(41)
-            ld.write('%.5e %.5e\n' % (u_D.t, assemble(load)))
+            #consistent forces
+            v = problem.trace_matrix.T * interpolate(Constant((1,0)), U_CR).vector().get_local()
+            load_test = np.dot(u, A*v)
+            ld.write('%.5e %.5e %.5e\n' % (u_D.t, assemble(load), load_test))
 
         cracking_facets = set()
 

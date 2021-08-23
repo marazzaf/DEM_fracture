@@ -10,14 +10,16 @@ parameters["form_compiler"]["cpp_optimize"] = True
 parameters["form_compiler"]["optimize"] = True
 
 # elastic parameters
-E = 1.4e9 #210e9 
-nu = 0.3
-mu    = Constant(E / (2.0*(1.0 + nu)))
-lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
+mu = 80.77e9
+lambda_ = 121.15e9
+#E = 1.4e9 #210e9 
+#nu = 0.3
+#mu    = Constant(E / (2.0*(1.0 + nu)))
+#lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
 penalty = float(mu)
-Gc = 120 #2.7e3
+Gc = 2.7e3 #2.7e3
 #k = 1.e-4 #loading speed
-t_init = 2.7e-5
+t_init = 0 #2.7e-5 #check that
 
 #sample dimensions
 Ll, l0, H = 1e-3, 0.5e-3, 1e-3
@@ -28,7 +30,7 @@ Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 #folder = 'structured'
 folder = 'unstructured'
 mesh = Mesh()
-size_ref = 22
+size_ref = 2
 with XDMFFile("mesh/fine.xdmf") as infile:
     infile.read(mesh)
 #size_ref = 1

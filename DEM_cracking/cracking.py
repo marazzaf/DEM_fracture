@@ -473,7 +473,7 @@ def test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets, broken_fa
                 dens = 0.5 * np.tensordot(facet_stress,facet_strain)
                 list_dens.append(dens)
         if len(list_dens) > 0:    
-            return breakable_facets[np.argmax(np.array(list_dens))]
+            return breakable_facets[np.argmax(np.array(list_dens))] #test with argmin? 
         else:
             return
     else:

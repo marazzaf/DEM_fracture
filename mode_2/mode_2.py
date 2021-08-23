@@ -10,13 +10,14 @@ parameters["form_compiler"]["cpp_optimize"] = True
 parameters["form_compiler"]["optimize"] = True
 
 # elastic parameters
-E = 210e9 
+E = 1.4e9 #210e9 
 nu = 0.3
 mu    = Constant(E / (2.0*(1.0 + nu)))
 lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
 penalty = float(mu)
-Gc = 2.7e3 #2700?
+Gc = 120 #2.7e3
 #k = 1.e-4 #loading speed
+t_init = 2.7e-5
 
 #sample dimensions
 Ll, l0, H = 1e-3, 0.5e-3, 1e-3
@@ -27,12 +28,12 @@ Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 #folder = 'structured'
 folder = 'unstructured'
 mesh = Mesh()
-#size_ref = 2
-#with XDMFFile("mesh/fine.xdmf") as infile:
-#    infile.read(mesh)
-size_ref = 1
-with XDMFFile("mesh/coarse.xdmf") as infile:
+size_ref = 22
+with XDMFFile("mesh/fine.xdmf") as infile:
     infile.read(mesh)
+#size_ref = 1
+#with XDMFFile("mesh/coarse.xdmf") as infile:
+#    infile.read(mesh)
 #size_ref = 3
 #with XDMFFile("mesh/very_fine.xdmf") as infile:
 #    infile.read(mesh)
@@ -87,7 +88,7 @@ print(problem.nb_dof_DEM)
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)
-u_D = Expression(('x[0] < L ? 0 : t', '0'), t=0, L=Ll, degree=1)
+u_D = Expression(('x[0] < L ? 0 : t', '0'), t=t_init, L=Ll, degree=1)
 
 #Load and non-homogeneous Dirichlet BC
 def eps(v): #v is a gradient matrix
@@ -113,7 +114,8 @@ solution_stress = Function(problem.W, name="Stress")
 
 #For outputs
 file = File('%s/test_%i_.pvd' % (folder,size_ref))
-ld = open('%s/ld_%i.txt' % (folder,size_ref), 'w')
+ld = open('%s/ld_%i.txt' % (folder,size_ref), 'w', 1)
+elastic_en = open(folder+'/elastic_energy_%i.txt' % size_ref, 'w', 1)
 
 count_output_crack = 1
 cracked_facet_vertices = []
@@ -157,10 +159,9 @@ A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 chi = 1
-dt = 1e-7 #1e-8 #ref
+dt = 1e-7 #1e-9 #ref
 print('dt: %.5e' % dt)
-T = 0.1e-3 #0.02e-3 #max in theory
-u_D.t = 0
+T = 3e-4 #0.01e-3 #max in theory
 
 while u_D.t < T:
     u_D.t += dt
@@ -188,6 +189,10 @@ while u_D.t < T:
         #Getting solution with BC interpolation
         u = problem.complete_solution(u_reduced,u_D)
 
+        #test with elastic energy
+        elas = 0.5*np.dot(A*u, u)
+        elastic_en.write('%.5e %.5e\n' % (u_D.t, elas))
+
         #Post-processing
         vec_u_CR = problem.DEM_to_CR * u
         vec_u_DG = problem.DEM_to_DG * u
@@ -197,10 +202,10 @@ while u_D.t < T:
         #outputs to test
         solution_u_DG.vector().set_local(vec_u_DG)
         solution_u_DG.vector().apply("insert")
-        file.write(solution_u_DG, u_D.t)
+        #file.write(solution_u_DG, u_D.t)
         solution_stress.vector().set_local(problem.mat_stress * problem.mat_grad * vec_u_CR)
         solution_stress.vector().apply("insert")
-        file.write(solution_stress, u_D.t)
+        #file.write(solution_stress, u_D.t)
 
         #Computing load displacement curve
         if count == 1:
@@ -219,6 +224,9 @@ while u_D.t < T:
         #Computing Gh per vertex and then kinking criterion
         Gh_v = problem.energy_release_rate_vertex_bis(broken_vertices, cracked_facets, vec_u_CR, vec_u_DG)
         print(max(Gh_v))
+
+        ##no crack version
+        #Gh_v = np.zeros_like(Gh_v)
 
         #Looking for facet with largest Gh
         idx = np.argpartition(Gh_v, -20)[-20:] #is 20 enough?
@@ -275,5 +283,6 @@ while u_D.t < T:
 
             cracked_facets.update(cracking_facets) #adding facets just cracked to broken facets
 
-print('End of computation !')
 ld.close()
+elastic_en.close()
+print('End of computation !')

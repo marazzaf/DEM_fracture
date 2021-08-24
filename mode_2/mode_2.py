@@ -10,16 +10,16 @@ parameters["form_compiler"]["cpp_optimize"] = True
 parameters["form_compiler"]["optimize"] = True
 
 # elastic parameters
-mu = 80.77e9
-lambda_ = 121.15e9
-#E = 1.4e9 #210e9 
-#nu = 0.3
-#mu    = Constant(E / (2.0*(1.0 + nu)))
-#lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
-penalty = float(mu)
+#mu = 80.77e9 #Ambati et al
+#lambda_ = 121.15e9 #Ambati et al
+E = 210e9 
+nu = 0.3
+mu    = Constant(E / (2.0*(1.0 + nu)))
+lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
+penalty = float(2*mu)
 Gc = 2.7e3 #2.7e3
 #k = 1.e-4 #loading speed
-t_init = 0 #2.7e-5 #check that
+t_init = 1e-2 #2.7e-5 #check that
 
 #sample dimensions
 Ll, l0, H = 1e-3, 0.5e-3, 1e-3
@@ -30,12 +30,12 @@ Ll, l0, H = 1e-3, 0.5e-3, 1e-3
 #folder = 'structured'
 folder = 'unstructured'
 mesh = Mesh()
-size_ref = 2
-with XDMFFile("mesh/fine.xdmf") as infile:
-    infile.read(mesh)
-#size_ref = 1
-#with XDMFFile("mesh/coarse.xdmf") as infile:
+#size_ref = 2
+#with XDMFFile("mesh/fine.xdmf") as infile:
 #    infile.read(mesh)
+size_ref = 1
+with XDMFFile("mesh/coarse.xdmf") as infile:
+    infile.read(mesh)
 #size_ref = 3
 #with XDMFFile("mesh/very_fine.xdmf") as infile:
 #    infile.read(mesh)
@@ -74,7 +74,8 @@ U_CR = VectorFunctionSpace(mesh, 'CR', 1) #Pour interpollation dans les faces
 v_CR = TestFunction(U_CR)
 
 #new for BC
-l4 = inner(v_CR('+'),as_vector((1.,1.))) / hF * ds(42) + inner(v_CR('+'),n) / hF * (ds(41) + ds(43))
+#l4 = inner(v_CR('+'),as_vector((1.,1.))) / hF * ds(42) + inner(v_CR('+'),n) / hF * (ds(41) + ds(43))
+l4 = inner(v_CR('+'),as_vector((1,1))) / hF * ds(42) + inner(v_CR('+'),as_vector((1,0))) / hF * ds(41)
 L4 = assemble(l4)
 vec_BC = L4.get_local()
 nz = vec_BC.nonzero()
@@ -90,7 +91,8 @@ print(problem.nb_dof_DEM)
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)
-u_D = Expression(('x[0] < L ? 0 : t', '0'), t=t_init, L=Ll, degree=1)
+#u_D = Expression(('x[0] < L ? 0 : t', '0'), t=t_init, L=Ll, degree=1)
+u_D = Expression(('t', '0'), t=t_init, degree=0)
 
 #Load and non-homogeneous Dirichlet BC
 def eps(v): #v is a gradient matrix
@@ -161,9 +163,9 @@ A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 chi = 1
-dt = 1e-7 #1e-9 #ref
+dt = 1e-3 #1e-7 #ref
 print('dt: %.5e' % dt)
-T = 3e-4 #0.01e-3 #max in theory
+T = 1e1 #0.01e-3 #max in theory
 
 while u_D.t < T:
     u_D.t += dt
@@ -225,6 +227,8 @@ while u_D.t < T:
 
         #Computing Gh per vertex and then kinking criterion
         Gh_v = problem.energy_release_rate_vertex_bis(broken_vertices, cracked_facets, vec_u_CR, vec_u_DG)
+        #put zero in vertices for x[0] < L/2
+        
         print(max(Gh_v))
 
         ##no crack version

@@ -19,7 +19,7 @@ lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
 penalty = float(2*mu)
 Gc = 2.7e3 #2.7e3
 #k = 1.e-4 #loading speed
-t_init = 1e-2 #2.7e-5 #check that
+t_init = 1e-5 #2.7e-5 #check that
 
 #sample dimensions
 Ll, l0, H = 1e-3, 0.5e-3, 1e-3
@@ -92,7 +92,7 @@ print(problem.nb_dof_DEM)
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)
 #u_D = Expression(('x[0] < L ? 0 : t', '0'), t=t_init, L=Ll, degree=1)
-u_D = Expression(('t', '0'), t=t_init, degree=0)
+u_D = Expression(('t*(x[1]+0.5*L)/L', '0'), L=Ll, t=t_init, degree=1)
 
 #Load and non-homogeneous Dirichlet BC
 def eps(v): #v is a gradient matrix
@@ -137,7 +137,8 @@ for (x,y) in problem.Graph.edges():
         cracking_facets.add(f)
         cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
         cells_with_cracked_facet |= {x,y}
-        broken_vertices |= set(problem.Graph[x][y]['vertices_ind'])
+        if pos[0] > Ll/4:
+            broken_vertices |= set(problem.Graph[x][y]['vertices_ind'])
 
 #adapting after crack
 problem.removing_penalty(cracking_facets)
@@ -163,7 +164,7 @@ A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 chi = 1
-dt = 1e-3 #1e-7 #ref
+dt = 1e-7 #1e-7 #ref
 print('dt: %.5e' % dt)
 T = 1e1 #0.01e-3 #max in theory
 
@@ -215,7 +216,7 @@ while u_D.t < T:
         if count == 1:
             #solution_stress.vector().set_local(stresses)
             #solution_stress.vector().apply("insert")
-            load = inner(dot(solution_stress, n), as_vector((1,0))) * ds(43) #change that for the consistent version!!!
+            load = inner(dot(solution_stress, n), as_vector((1,0))) * ds(41) #change that for the consistent version!!!
             
 
             #jeremy

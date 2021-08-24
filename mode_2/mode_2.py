@@ -129,6 +129,13 @@ not_breakable_facets = set()
 cracking_facets = set()
 broken_vertices = set()
 
+#removing facets with x[1] > 0
+for (x,y) in problem.Graph.edges():
+    f = problem.Graph[x][y]['dof_CR'][0] // d
+    pos = problem.Graph[x][y]['barycentre']
+    if pos[1] > 0:
+        not_breakable_facets.add(f)
+
 #before the computation begins, we break the facets
 for (x,y) in problem.Graph.edges():
     f = problem.Graph[x][y]['dof_CR'][0] // d
@@ -137,7 +144,7 @@ for (x,y) in problem.Graph.edges():
         cracking_facets.add(f)
         cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
         cells_with_cracked_facet |= {x,y}
-        if pos[0] > Ll/4:
+        if pos[0] > Ll/2-Ll/10:
             broken_vertices |= set(problem.Graph[x][y]['vertices_ind'])
 
 #adapting after crack
@@ -164,7 +171,7 @@ A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 chi = 1
-dt = 1e-7 #1e-7 #ref
+dt = 1e-6 #1e-7 #ref
 print('dt: %.5e' % dt)
 T = 1e1 #0.01e-3 #max in theory
 
@@ -228,20 +235,20 @@ while u_D.t < T:
 
         #Computing Gh per vertex and then kinking criterion
         Gh_v = problem.energy_release_rate_vertex_bis(broken_vertices, cracked_facets, vec_u_CR, vec_u_DG)
-        #put zero in vertices for x[0] < L/2
-        
         print(max(Gh_v))
 
         ##no crack version
         #Gh_v = np.zeros_like(Gh_v)
 
         #Looking for facet with largest Gh
-        idx = np.argpartition(Gh_v, -20)[-20:] #is 20 enough?
+        size = 40 #is it enough?
+        idx = np.argpartition(Gh_v, -size)[-size:] 
         indices = idx[np.argsort((-Gh_v)[idx])]
 
         #Kinking to choose breaking facet
         for v in indices:
             if Gh_v[v] > Gc:
+                #print('Breaking?')
                 f = test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets,cracked_facets, vec_u_DG)
                 if f != None:
                     cracking_facets = {f}

@@ -465,17 +465,18 @@ def test_kinking_criterion(problem, v, vec_u_CR, not_breakable_facets, broken_fa
         list_dens = []
 
         for fp in breakable_facets:
-            if normal_jump[fp] > 0: #otherwise facet is in compression
-                c1,c2 = problem.facet_num.get(fp)
-                assert problem.d == 2
-                facet_stress = 0.5*(stress[c1]+stress[c2])
-                facet_strain = 0.5*(strain[c1]+strain[c2])
-                dens = 0.5 * np.tensordot(facet_stress,facet_strain)
-                ##test
-                #dens_1 = 0.5 * np.tensordot(stress[c1], strain[c1])
-                #dens_2 = 0.5 * np.tensordot(stress[c2], strain[c2])
-                #dens = 0.5*(dens_1+dens_2)
-                list_dens.append(dens)
+            #if normal_jump[fp] > 0: #otherwise facet is in compression
+                     
+            c1,c2 = problem.facet_num.get(fp)
+            assert problem.d == 2
+            facet_stress = 0.5*(stress[c1]+stress[c2])
+            facet_strain = 0.5*(strain[c1]+strain[c2])
+            dens = 0.5 * np.tensordot(facet_stress,facet_strain)
+            ##test
+            #dens_1 = 0.5 * np.tensordot(stress[c1], strain[c1])
+            #dens_2 = 0.5 * np.tensordot(stress[c2], strain[c2])
+            #dens = 0.5*(dens_1+dens_2)
+            list_dens.append(dens)
         if len(list_dens) > 0:    
             return breakable_facets[np.argmax(np.array(list_dens))] #test with argmin?
             #return breakable_facets[np.argmin(np.array(list_dens))]

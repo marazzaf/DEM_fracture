@@ -19,7 +19,7 @@ lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
 penalty = float(2*mu)
 Gc = 2.7e3 #2.7e3
 #k = 1.e-4 #loading speed
-t_init = 1e-5 #2.7e-5 #check that
+t_init = 1e-6 #2.7e-5 #check that
 
 #sample dimensions
 Ll, l0, H = 1e-3, 0.5e-3, 1e-3
@@ -171,7 +171,7 @@ A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
 chi = 1
-dt = 1e-6 #1e-7 #ref
+dt = 1e-7 #1e-7 #ref
 print('dt: %.5e' % dt)
 T = 1e1 #0.01e-3 #max in theory
 

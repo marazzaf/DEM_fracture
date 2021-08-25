@@ -210,9 +210,11 @@ def Solve(A, b):
     ksp = PETSc.KSP().create()
     ksp.setOperators(A)
 
-    #use CG and ICC
+    #Solve with PETSc
     ksp.setType('cg')
-    ksp.getPC().setType('icc')
+    ksp.getPC().setType('hypre') #icc')
+    ksp.setTolerances(rtol=1e-5,atol=1e-8)
+    ksp.setFromOptions()
     
     # obtain sol & rhs vectors
     x, c = A.getVecs()

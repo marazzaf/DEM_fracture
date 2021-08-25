@@ -33,20 +33,7 @@ ds = Measure("ds",subdomain_data=boundaries)
 cells_meshfunction = MeshFunction("size_t", mesh, 2)
 dxx = dx(subdomain_data=cells_meshfunction)
 
-class NotCrack(SubDomain):
-    def inside(self, x, on_boundary):
-        return on_boundary and (near(x[0], 0) or near(x[0], L) or near(x[1], -H/2) or near(x[1], H/2))
-not_crack = NotCrack()
-not_crack.mark(boundaries, 1)
-
-V = FunctionSpace(mesh, 'CG', 1)
-v = TestFunction(V)
-A = FacetArea(mesh)
-vec = assemble(v / A * ds(0)).get_local()
-nz = vec.nonzero()[0]
-
-#print(V.dofmap().global_dimension())
-#sys.exit()
+#Putting crack in
 
 def w(alpha):
     """Dissipated energy function as a function of the damage """
@@ -102,8 +89,7 @@ bc_u = DirichletBC(V_u, u_D, boundaries, 0)
 
 # Damage
 bcalpha_0 = DirichletBC(V_alpha, Constant(0.0), boundaries, 1)
-bcalpha_1 = DirichletBC(V_alpha, Constant(1.0), boundaries, 0) #crack lips
-bc_alpha = [bcalpha_0, bcalpha_1]
+bc_alpha = [bcalpha_0]
 
 import ufl
 E_du = ufl.replace(E_u,{u:du})
@@ -143,6 +129,10 @@ solver_alpha.setFunction(pb_alpha.F, b.vec())
 A = PETScMatrix()
 solver_alpha.setJacobian(pb_alpha.J, A.mat())
 
+#Putting crack in
+crack = Expression('x[0] < && fbas(x[1]) < 1 ? exp()  : 0', degree = 1) #see in Hughes
+lb = interpolate(crack, V_alpha)
+
 #bounds for damage
 lb = interpolate(Constant("0."), V_alpha) # lower bound, initialize to 0
 ub = interpolate(Constant("1."), V_alpha) # upper bound, set to 1
@@ -164,7 +154,9 @@ def alternate_minimization(u,alpha,tol=1.e-5,maxiter=100,alpha_0=interpolate(Con
         xv = as_backend_type(xx.vector()).vec()
         solver_alpha.solve(None, xv)
         alpha.vector()[:] = xv
+        alpha.vector().apply('insert')
         alpha_error.vector()[:] = alpha.vector() - alpha_0.vector()
+        alpha_error.vector().apply('insert')
         err_alpha = norm(alpha_error.vector(),"linf")
         # monitor the results
         if MPI.comm_world.rank == 0:
@@ -173,76 +165,6 @@ def alternate_minimization(u,alpha,tol=1.e-5,maxiter=100,alpha_0=interpolate(Con
         alpha_0.assign(alpha)
         iter=iter+1
     return (err_alpha, iter)
-
-V_theta = VectorFunctionSpace(mesh, "CG", 1) #change with discretization?
-theta = Function(V_theta, name="Theta")
-theta_trial = TrialFunction(V_theta)
-theta_test = TestFunction(V_theta)
-
-d2v = dof_to_vertex_map(V_alpha)
-xcoor = mesh.coordinates()[d2v][:, 0]
-
-def find_crack_tip():
-    # Estimate the current crack tip
-    ind = alpha.vector().get_local() > 0.5
-    if ind.any():
-        xmax = xcoor[ind].max()
-    else:
-        xmax = 0.0
-    x0 = MPI.max(MPI.comm_world, xmax)
-
-    return [x0, 0]
-
-def calc_theta(pos_crack_tip=[0., 0.]):
-    x0 = pos_crack_tip[0]  # x-coordinate of the crack tip
-    y0 = pos_crack_tip[1]  # y-coordinate
-    r = 2*float(ell)
-    R = 5*float(ell)
-
-    def neartip(x, on_boundary):
-        dist = sqrt((x[0]-x0)**2 + (x[1]-y0)**2)
-        return dist < r
-
-    def outside(x, on_boundary):
-        dist = sqrt((x[0]-x0)**2 + (x[1]-y0)**2)
-        return dist > R
-
-    class bigcircle(SubDomain):
-        def inside(self, x, on_boundary):
-            dist = sqrt((x[0]-x0)**2 + (x[1]-y0)**2)
-            return dist < 1.1*R
-
-    bigcircle().mark(cells_meshfunction, 1)
-
-    bc1 = DirichletBC(V_theta, Constant([1.0, 0.0]), neartip)
-    bc2 = DirichletBC(V_theta, Constant([0.0, 0.0]), outside)
-    bc = [bc1, bc2]
-    a = inner(grad(theta_trial), grad(theta_test))*dx
-    L = inner(Constant([0.0, 0.0]), theta_test)*dx
-    solve(a == L, theta, bc, solver_parameters={"linear_solver": "cg", "preconditioner": "hypre_amg"})
-
-def calc_gtheta():
-    sig = sigma(u,alpha)
-    psi = 0.5 * inner(sig, grad(u))
-
-    # Static and dynamic energy release rates
-    Gstat = inner(sig, dot(grad(u), grad(theta))) - psi*div(theta)
-
-    # Damage dissipation rate
-    q = 6*Gc*ell/8*grad(alpha)  # only for AT1!
-    Gamma = (Gc/float(c_w)*(w(alpha)/ell + ell*dot(grad(alpha), grad(alpha))))*div(theta) - inner(q, grad(theta)*grad(alpha))
-
-    # Generalized J-integral
-    # Y = (1-self.problem.alpha)*inner(self.problem.material.sigma0(self.problem.u), self.problem.material.eps(self.problem.u))-3*Gc/(8*ell)
-    Y = (1-alpha)*(Dx(u, 1))**2-3*Gc/(8*ell)
-    JmG = (Y+div(q))*inner(grad(alpha), theta)
-
-    Gstat_value = assemble(Gstat*dxx(1))
-    Gamma_value = assemble(Gamma*dxx(1))
-    JmG_value = assemble(JmG*dxx(1))
-
-    return Gstat_value,Gamma_value,JmG_value
-
 
 savedir = "ref_surfing_%i" % num_computation
 if os.path.isdir(savedir):
@@ -263,16 +185,6 @@ def postprocessing():
     #file_u << (u,r.t)
     #stress.vector()[:] = project(sigma(u,alpha), W).vector()
     #file_sig << (stress,r.t)
-
-    #Energies
-    elastic_energy_value = assemble(elastic_energy)
-    surface_energy_value = assemble(dissipated_energy)
-    energies = [elastic_energy_value,surface_energy_value,elastic_energy_value+surface_energy_value]
-    pos = find_crack_tip()
-    calc_theta(pos)
-    res = calc_gtheta()
-    
-    save_energies.write('%.2e %.5e %.5e %.5e %.5e %.5e %.5e %.4e\n' % (r.t, energies[0], energies[1], energies[2], res[0]/Gc_eff, res[1]/Gc_eff, res[2]/Gc_eff, pos[0]))
     
 
 T = 1 #final simulation time

@@ -29,8 +29,8 @@ t_init = 9e-3 #1e-6 #2.7e-5 #check that
 #folder = 'structured'
 folder = 'unstructured'
 mesh = Mesh()
-size_ref = 4 #4 for 'test' #5 for 'test_2'
-with XDMFFile("mesh/test.xdmf") as infile:
+size_ref = 5 #4 for 'test' #5 for 'test_2'
+with XDMFFile("mesh/test_2.xdmf") as infile:
     infile.read(mesh)
 Ll, l0, H = 1, 0.5, 1 #for this sample...
 #size_ref = 2
@@ -214,7 +214,7 @@ while u_D.t < T:
         #outputs to test
         solution_u_DG.vector().set_local(vec_u_DG)
         solution_u_DG.vector().apply("insert")
-        #file.write(solution_u_DG, u_D.t)
+        file.write(solution_u_DG, u_D.t)
         solution_stress.vector().set_local(problem.mat_stress * problem.mat_grad * vec_u_CR)
         solution_stress.vector().apply("insert")
         #file.write(solution_stress, u_D.t)
@@ -233,6 +233,7 @@ while u_D.t < T:
             #load_test = np.dot(A*u, v)
             ld.write('%.5e %.5e %.5e\n' % (u_D.t, assemble(load), load_test))
 
+        sys.exit()
         cracking_facets = set()
 
         #Computing Gh per vertex and then kinking criterion

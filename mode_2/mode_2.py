@@ -27,7 +27,7 @@ t_init = 9e-3 #1e-6 #2.7e-5 #check that
 #size_ref = 100 #80 #40 #20 #10
 #mesh = RectangleMesh(Point(0., H/2), Point(Ll, -H/2), size_ref, size_ref, "crossed")
 #folder = 'structured'
-folder = 'unstructured'
+folder = 'unstructured/med'
 mesh = Mesh()
 size_ref = 5 #4 for 'test' #5 for 'test_2'
 with XDMFFile("mesh/test_2.xdmf") as infile:
@@ -90,7 +90,6 @@ nz_vec_BC = set(nz_vec_BC)
 #Creating the DEM problem
 problem = DEMProblem(mesh, d, penalty, nz_vec_BC, mu)
 print(problem.nb_dof_DEM)
-#sys.exit()
 
 #For Dirichlet BC
 x = SpatialCoordinate(mesh)
@@ -233,7 +232,6 @@ while u_D.t < T:
             #load_test = np.dot(A*u, v)
             ld.write('%.5e %.5e %.5e\n' % (u_D.t, assemble(load), load_test))
 
-        sys.exit()
         cracking_facets = set()
 
         #Computing Gh per vertex and then kinking criterion

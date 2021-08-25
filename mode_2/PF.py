@@ -4,8 +4,6 @@
 from dolfin import *
 import matplotlib.pyplot as plt
 import numpy as np
-import time
-from ufl import sign
 plt.rcParams['image.cmap'] = 'viridis'
 import sys, os, sympy, shutil, math
 parameters["form_compiler"].update({"optimize": True, "cpp_optimize": True, "representation":"uflacs", "quadrature_degree": 2})
@@ -22,11 +20,10 @@ num_computation = 1
 cell_size = mesh.hmax()
 ndim = mesh.topology().dim() # get number of space dimensions
 
-E, nu = Constant(1.0), Constant(0.3)
-kappa = (3-nu)/(1+nu)
-mu = 0.5*E/(1+nu)
+# elastic parameters
+mu = 80.77 #Ambati et al
+lambda_ = 121.15 #Ambati et al
 Gc = Constant(1.5)
-K1 = Constant(1.)
 ell = Constant(5*cell_size)
 h = mesh.hmax()
 
@@ -66,9 +63,7 @@ def eps(u):
 
 def sigma_0(u):
     """Stress tensor of the undamaged material as a function of the displacement"""
-    mu    = E/(2.0*(1.0 + nu))
-    lmbda = E*nu/(1 - nu) / (1 - 2*nu)
-    return 2.0*mu*(eps(u)) + lmbda*tr(eps(u))*Identity(ndim)
+    return 2.0*mu*(eps(u)) + lambda_*tr(eps(u))*Identity(ndim)
 
 def sigma(u,alpha):
     """Stress tensor of the damaged material as a function of the displacement and the damage"""
@@ -88,16 +83,11 @@ alpha, dalpha, beta = Function(V_alpha, name='damage'), TrialFunction(V_alpha), 
 
 n = FacetNormal(mesh)
 
-#Dirichlet BC on disp
-vel = 4 #given velocity
-x = SpatialCoordinate(mesh)
-r = Expression('sqrt((x[0]-v*t) * (x[0]-v*t) + x[1] * x[1])', v=vel, t=0, degree = 2)
-X = x[1] / (x[0]-vel*r.t) #-l0
-c_theta = 1. / sqrt(1 + X**2.) * sign(x[0]-vel*r.t) #-l0
-c_theta_2 = sqrt(0.5 * (1+c_theta))
-s_theta_2 = sqrt(0.5 * (1-c_theta)) * sign(x[1])
-u_D = K1/(2*mu) * sqrt(r/(2*np.pi)) * (kappa - c_theta) * as_vector((c_theta_2,s_theta_2)) #condition de bord de Dirichlet en disp
+#Dirichlet BC
+t_init = 9e-3
+u_D = Expression('t*(x[1]+0.5*L)/L', L=L, t=t_init, degree=1)
 
+#energies
 elastic_energy = 0.5*inner(sigma(u,alpha), eps(u))*dx
 dissipated_energy = Gc/float(c_w)*(w(alpha)/ell + ell*dot(grad(alpha), grad(alpha)))*dx
 total_energy = elastic_energy + dissipated_energy
@@ -113,7 +103,6 @@ bc_u = DirichletBC(V_u, u_D, boundaries, 0)
 # Damage
 bcalpha_0 = DirichletBC(V_alpha, Constant(0.0), boundaries, 1)
 bcalpha_1 = DirichletBC(V_alpha, Constant(1.0), boundaries, 0) #crack lips
-#bcalpha_2 = DirichletBC(V_alpha, Constant(0.0), boundaries, 0)
 bc_alpha = [bcalpha_0, bcalpha_1]
 
 import ufl
@@ -309,14 +298,11 @@ while r.t < T:
     solver_u = LinearVariationalSolver(problem_u)
     solver_u.parameters.update({"linear_solver": "cg", "preconditioner": "hypre_amg"}) #{"linear_solver" : "umfpack"})
 
-    #Checking BC
-    #BC = project(u_D, V_u)
-    #file_BC << (BC, rr.t)
-    #u_D.t = rr.t
     # solve alternate minimization
     alternate_minimization(u,alpha,maxiter=30) #,alpha_0=alpha.copy(deepcopy=True))
     # updating the lower bound to account for the irreversibility
     lb.vector()[:] = alpha.vector()
+    lb.vector().apply('insert')
     postprocessing()
     #sys.exit()
 

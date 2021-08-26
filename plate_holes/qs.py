@@ -13,21 +13,23 @@ parameters["form_compiler"]["optimize"] = True
 #nu = 0.22
 #mu    = Constant(E / (2.0*(1.0 + nu)))
 #lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
-lambda_ = Constant(1.94e9)
-mu = Constant(2.45e9)
+lambda_ = Constant(1.94) #1.94e9
+mu = Constant(2.45) #2.45e9
+Gc = Constant(2.28e-3) #2.28e3
 penalty = float(2*mu)
-Gc = 2.28e3
 
 #sample dimensions
-Ll, l0, H = 65e-3, 10e-3, 120e-3
+#Ll, l0, H = 65e-3, 10e-3, 120e-3
+Ll, l0, H = 65, 10, 120
 
 #mesh
 folder = 'test'
 mesh = Mesh()
-size_ref = 2 #3 #2 #1
+size_ref = 12 #3 #2 #1
 #with XDMFFile("mesh/very_fine.xdmf") as infile:
 #with XDMFFile("mesh/fine.xdmf") as infile:
-with XDMFFile("mesh/coarse.xdmf") as infile:
+#with XDMFFile("mesh/coarse.xdmf") as infile:
+with XDMFFile("mesh/test_2.xdmf") as infile:
     infile.read(mesh)
 h = mesh.hmax()
 print(h)
@@ -38,15 +40,15 @@ d = 2 #vectorial case
 
 # Sub domain for BC
 def upper_hole(x, on_boundary):
-    x0 = 20e-3
-    y0 = H/2-20e-3
-    radius = 10e-3
+    x0 = 20#e-3
+    y0 = H/2-20#e-3
+    radius = 10#e-3
     return (x[0]-x0)*(x[0]-x0)+(x[1]-y0)*(x[1]-y0) < radius*radius and on_boundary
 
 def lower_hole(x, on_boundary):
-    x0 = 20e-3
-    y0 = -H/2+20e-3
-    radius = 10e-3
+    x0 = 20#e-3
+    y0 = -H/2+20#e-3
+    radius = 10#e-3
     return (x[0]-x0)*(x[0]-x0)+(x[1]-y0)*(x[1]-y0) < radius*radius and on_boundary
 
 bnd_facets.set_all(0)
@@ -120,7 +122,7 @@ broken_vertices = set()
 for (x,y) in problem.Graph.edges():
     f = problem.Graph[x][y]['dof_CR'][0] // d
     pos = problem.Graph[x][y]['barycentre']
-    if problem.Graph[x][y]['breakable'] and abs(pos[1] - (H/2-55e-3)) < 1.e-15 and pos[0] < l0:
+    if problem.Graph[x][y]['breakable'] and abs(pos[1] - (H/2-55)) < 1.e-15 and pos[0] < l0:
         cracking_facets.add(f)
         cracked_facet_vertices.append(problem.Graph[x][y]['vertices']) #position of vertices of the broken facet
         cells_with_cracked_facet |= {x,y}
@@ -149,10 +151,10 @@ for c in cells_with_cracked_facet:
 A_not_D,B = problem.schur_complement(A)
 
 #definition of time-stepping parameters
-dt = 1e-5 #1e-5
+dt = 1e-3 #1e-5
 print('dt: %.5e' % dt)
-T = 0.6e-3
-u_D.t = 0
+T = 0.6
+u_D.t = 0.5-dt
 
 while u_D.t < T:
     u_D.t += dt
@@ -178,6 +180,9 @@ while u_D.t < T:
         #Post-processing
         vec_u_CR = problem.DEM_to_CR * u
         vec_u_DG = problem.DEM_to_DG * u
+        solution_u_DG.vector().set_local(vec_u_DG)
+        solution_u_DG.vector().apply("insert")
+        file.write(solution_u_DG, u_D.t)
         stresses = problem.mat_stress * problem.mat_grad * vec_u_CR
         stress_per_cell = stresses.reshape((problem.nb_dof_cells // problem.d,problem.dim,problem.dim))
 
@@ -185,12 +190,14 @@ while u_D.t < T:
         if count == 1:
             solution_stress.vector().set_local(stresses)
             solution_stress.vector().apply("insert")
-            t = as_vector((n[1],-n[0]))
-            load1 = inner(dot(solution_stress, n), n) * ds(41)
-            load2 = inner(dot(solution_stress, n), n) * ds(42)
-            load3 = inner(dot(solution_stress, n), t) * ds(41)
-            load4 = inner(dot(solution_stress, n), -t) * ds(42)
-            tot_load = assemble(load1+load2+load3+load4)
+            #t = as_vector((n[1],-n[0]))
+            #load1 = inner(dot(solution_stress, n), n) * ds(41)
+            load1 = inner(dot(solution_stress, n), Constant((0,1))) * ds(41)
+            #load2 = inner(dot(solution_stress, n), n) * ds(42)
+            #load2 = inner(dot(solution_stress, n), Constant((0,-1))) * ds(42)
+            #load3 = inner(dot(solution_stress, n), t) * ds(41)
+            #load4 = inner(dot(solution_stress, n), -t) * ds(42)
+            tot_load = assemble(load1) #+load2)#+load3+load4)
             print(tot_load)
             sys.exit()
             ld.write('%.5e %.5e\n' % (u_D.t, tot_load))

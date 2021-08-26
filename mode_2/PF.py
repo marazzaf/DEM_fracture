@@ -21,9 +21,8 @@ cell_size = mesh.hmax()
 # elastic parameters
 mu = 80.77 #Ambati et al
 lambda_ = 121.15 #Ambati et al
-Gc = Constant(1.5)
+Gc = Constant(2.7e-3)
 ell = Constant(5*cell_size)
-h = mesh.hmax()
 
 bnd_facets = MeshFunction("size_t", mesh,1)
 bnd_facets.set_all(0)
@@ -71,7 +70,7 @@ def sigma(u,alpha):
 
 z = sympy.Symbol("z")
 c_w = 4*sympy.integrate(sympy.sqrt(w(z)),(z,0,1))
-Gc_eff = Gc * (1 + h/(ell*4*float(c_w)))
+Gc_eff = Gc * (1 + cell_size/(ell*4*float(c_w)))
 
 # Create function space for 2D elasticity + Damage
 V_u = VectorFunctionSpace(mesh, "CG", 1)
@@ -149,7 +148,11 @@ A = PETScMatrix()
 solver_alpha.setJacobian(pb_alpha.J, A.mat())
 
 #Putting crack in
-crack = Expression('x[0] < 0.5*L && fabs(x[1]) < 0.01 ? 1 : 0', L=L, degree = 1) #see in Hughes
+c = 1.7e-2
+B = 1/c - 1
+d = Expression('x[0] < 0.5*L ? fabs(x[1]) : sqrt(x[1]*x[1] + (x[0]-0.5*L)*(x[0]-0.5*L))', L=L, degree=1)
+#crack = Expression('d < ell ? 1 : 0', d=d, ell=ell, degree=1)
+crack = Expression('d < ell ? B*0.25*Gc/ell*(1-d/ell) : 0', d=d, ell=ell, B=B, Gc=Gc, degree = 1) #see in Hughes
 lb = interpolate(crack, V_alpha)
 #lb = interpolate(Constant(0), V_alpha)
 alpha.vector()[:] = lb.vector()

@@ -23,6 +23,10 @@ mu = 80.77 #Ambati et al
 lambda_ = 121.15 #Ambati et al
 Gc = Constant(2.7e-3)
 ell = Constant(5*cell_size)
+#E = 210 #210e9 
+#nu = 0.3
+#mu    = Constant(E / (2.0*(1.0 + nu)))
+#lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
 
 bnd_facets = MeshFunction("size_t", mesh,1)
 bnd_facets.set_all(0)
@@ -83,7 +87,7 @@ alpha, dalpha, beta = Function(V_alpha, name='damage'), TrialFunction(V_alpha), 
 n = FacetNormal(mesh)
 
 #Dirichlet BC
-t_init = 9e-3
+t_init = 1e-2
 u_D = Expression('t*(x[1]+0.5*L)/L', L=L, t=t_init, degree=1)
 
 #energies
@@ -180,7 +184,7 @@ file_u << u
 file_alpha << alpha
 
 #Force imposée
-v = Expression(('(x[1]+0.5*L)/L', '0'), L=L, degree=1)
-v = interpolate(v, V_u)
-load = inner(dot(sigma_0(u), n), as_vector((1,0))) * ds(41)
+#v = Expression(('(x[1]+0.5*L)/L', '0'), L=L, degree=1)
+#v = interpolate(v, V_u)
+load = inner(dot(sigma_0(u), n), as_vector((1,0))) * ds(41) + inner(dot(sigma_0(u), n), as_vector((-1,-1))) * ds(42)
 print(assemble(load))

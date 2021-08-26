@@ -9,11 +9,13 @@ parameters["form_compiler"]["cpp_optimize"] = True
 parameters["form_compiler"]["optimize"] = True
 
 # elastic parameters
-E = 6e9 
-nu = 0.22
-mu    = Constant(E / (2.0*(1.0 + nu)))
-lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
-penalty = float(mu)
+#E = 6e9 
+#nu = 0.22
+#mu    = Constant(E / (2.0*(1.0 + nu)))
+#lambda_ = Constant(E*nu / ((1.0 + nu)*(1.0 - 2.0*nu)))
+lambda_ = Constant(1.94e9)
+mu = Constant(2.45e9)
+penalty = float(2*mu)
 Gc = 2.28e3
 
 #sample dimensions
@@ -24,8 +26,8 @@ folder = 'test'
 mesh = Mesh()
 size_ref = 2 #3 #2 #1
 #with XDMFFile("mesh/very_fine.xdmf") as infile:
-with XDMFFile("mesh/fine.xdmf") as infile:
-#with XDMFFile("mesh/coarse.xdmf") as infile:
+#with XDMFFile("mesh/fine.xdmf") as infile:
+with XDMFFile("mesh/coarse.xdmf") as infile:
     infile.read(mesh)
 h = mesh.hmax()
 print(h)
@@ -183,8 +185,15 @@ while u_D.t < T:
         if count == 1:
             solution_stress.vector().set_local(stresses)
             solution_stress.vector().apply("insert")
-            load = inner(dot(solution_stress, n), as_vector((0,1))) * ds(41)
-            ld.write('%.5e %.5e\n' % (u_D.t, assemble(load)))
+            t = as_vector((n[1],-n[0]))
+            load1 = inner(dot(solution_stress, n), n) * ds(41)
+            load2 = inner(dot(solution_stress, n), n) * ds(42)
+            load3 = inner(dot(solution_stress, n), t) * ds(41)
+            load4 = inner(dot(solution_stress, n), -t) * ds(42)
+            tot_load = assemble(load1+load2+load3+load4)
+            print(tot_load)
+            sys.exit()
+            ld.write('%.5e %.5e\n' % (u_D.t, tot_load))
 
         cracking_facets = set()
         #Computing Gh per vertex and then kinking criterion

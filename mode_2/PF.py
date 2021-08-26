@@ -186,5 +186,7 @@ file_alpha << alpha
 #Force imposée
 #v = Expression(('(x[1]+0.5*L)/L', '0'), L=L, degree=1)
 #v = interpolate(v, V_u)
-load = inner(dot(sigma_0(u), n), as_vector((1,0))) * ds(41) + inner(dot(sigma_0(u), n), as_vector((-1,-1))) * ds(42)
-print(assemble(load))
+load1 = inner(dot(sigma_0(u), n), as_vector((1,0))) * ds(41)
+load2 = inner(dot(sigma_0(u), n), as_vector((-1,0))) * ds(42)
+tot_load = load1+load2
+print(assemble(tot_load))
